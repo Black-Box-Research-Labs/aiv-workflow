@@ -47,11 +47,11 @@ original finding through to the merge judgment.
 Then, in each project you want to use it on:
 
 1. Make sure the project is AIV-enabled (`aiv init` from aiv-protocol if not).
-2. Copy `config/aiv-workflow.config.example.yml` to `<repo-root>/.aiv/workflow.config.yml` and edit
+2. Copy `config/aiv-workflow.config.example.yml` to `<repo-root>/.aiv-workflow.yml` and edit
    the bindings (paths, branch naming, CI commands, plan archetypes). Every key has a default; most
    projects only set a handful.
 
-The skills read `.aiv/workflow.config.yml` at the start of a run and fall back to documented defaults
+The skills read `.aiv-workflow.yml` at the start of a run and fall back to documented defaults
 when a key (or the whole file) is absent.
 
 ## Requirements

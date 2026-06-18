@@ -1,6 +1,7 @@
 # aiv-workflow per-project config
 #
-# Copy to  <repo-root>/.aiv/workflow.config.yml  and edit.
+# Copy to  <repo-root>/.aiv-workflow.yml  and edit.
+# (Distinct from aiv-protocol's own `.aiv.yml`, which `aiv init` creates.)
 # Skills read this file at the start of a run (path overridable via $AIV_WORKFLOW_CONFIG).
 # Every key has a documented default; delete a key to accept its default.
 # "auto" means the skill derives the value at runtime (usually from git).
@@ -14,13 +15,16 @@ project:
   repo_root: auto
 
 # ── Binding to aiv-protocol (Layer 1). Skills CALL this; they never reimplement the spec. ──
+# aiv-protocol keeps its OWN config at `.aiv.yml` (created by `aiv init`), distinct from THIS file.
+# `aiv init` also creates .github/aiv-packets/ (Layer 2 packets) + .github/aiv-evidence/ (Layer 1).
 aiv:
-  cli: aiv                                    # aiv-protocol CLI, expected on PATH
+  cli: aiv                                    # aiv-protocol CLI on PATH (pip install aiv-protocol)
   spec_path: aiv-protocol/SPECIFICATION.md    # canonical spec (submodule or vendored copy)
-  packets_dir: .github/aiv-packets            # where verification packets live
-  evidence_dir: .github/aiv-packets/evidence  # prove-it writes behavioral artifacts here
-  guard_cmd: "aiv guard"                       # packet/evidence validator invocation
+  packets_dir: .github/aiv-packets            # Layer 2 verification packets
+  evidence_dir: .github/aiv-packets/evidence  # prove-it behavioral artifacts (distinct from .github/aiv-evidence/)
+  check_cmd: "aiv check"                        # validate a packet locally (file/stdin/arg; --diff, --strict, --audit-links)
   init_cmd: "aiv init"                          # AIV-ify a not-yet-enabled project (start-pr runs this)
+  svp_cmd: "aiv svp"                            # Sovereign Verification Protocol sub-app (predict/probe/trace/falsify)
 
 # ── All-class evidence mandate (Layer-2 authoring convention; CI enforcement lives in aiv-protocol). ──
 evidence:
@@ -50,9 +54,13 @@ branch:
   # {root_parent} = dirname(repo_root); {project} = project.name; {slug} = PR slug
   worktree_pattern: "{root_parent}/{project}-pr-{slug}"
   base: origin/main
+  install_cmd: "npm ci"          # deps install for a functional PR (start-pr); skip for docs-only
   # Commands run after `git worktree add` (project pre-flight). Optional; omit if none.
-  postcreate:
-    - "git submodule update --init --recursive"
+  # These are project-specific; enable only what your repo needs.
+  postcreate: []
+  # Example (uncomment per project):
+  #   - "git submodule update --init --recursive"
+  #   - "mkdir -p secure-storage"
 
 # ── CI (poll-ci, the push gate, prove-it). ──
 ci:
@@ -73,9 +81,29 @@ review:
     progress_tracker: ""         # e.g. "§15.3"
     iteration: ""                # e.g. "§13.5"
   coord_file: ""                 # multi-PR coordination doc, if any
+  contracts_dir: .aiv/launch-briefs   # where or-review finds completion contracts (match launch_brief.out_dir)
 
 # ── Merge (poll-ci, the merge gate). ──
 merge:
   strategy: rebase               # rebase only; squash forbidden
   delete_branch: true
   autonomous: false              # MUST stay false; the human is the merge gate
+
+# ── Project docs (ground-yourself). ──
+docs:
+  architecture: docs/ARCHITECTURE.md   # the doc grounding reads to place a change; blank -> skip
+
+# ── Code-health + coverage (check-drift §2.5/§2.2c). Blank disables the sub-check. ──
+quality:
+  code_health_cmd: ""            # configured code-health tool (e.g. CodeScene); blank -> skip
+  coverage_floor: ""             # coverage ratchet floor (e.g. "15/15/21/14%"); blank -> no numeric target
+
+# ── Audit output (rigor-audit). ──
+audit:
+  out_dir: .aiv/audits           # rigor-audit writes the Sources-Checked Manifest here
+
+# ── launch-brief output + PR-class vocabulary. ──
+launch_brief:
+  out_dir: .aiv/launch-briefs    # brief + completion contract written here (match review.contracts_dir)
+  # Default project-agnostic class set; extend per project.
+  pr_classes: [migration, ui-render, dispatcher, refactor, schema-additive, infrastructure, test-debt, observability, docs]

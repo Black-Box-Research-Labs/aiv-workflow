@@ -8,7 +8,7 @@ rules so the same `SKILL.md` runs on any AIV-enabled project, not just the one i
 A skill is agent-read markdown. "Reading config" means the skill *instructs the agent* to load the
 project config before acting:
 
-> Read `.aiv/workflow.config.yml` at the repo root (`git rev-parse --show-toplevel`; override via
+> Read `.aiv-workflow.yml` at the repo root (`git rev-parse --show-toplevel`; override via
 > `$AIV_WORKFLOW_CONFIG`). If absent, use the defaults named inline below and say so.
 
 Reference config values by **dotted key in backticks, with the default in parentheses** on first use:

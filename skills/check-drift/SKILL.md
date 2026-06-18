@@ -266,6 +266,9 @@ These look ACROSS plans and over time. Phase 1 audits the plan in isolation; Pha
 against its context. All git probes run against the repo root (`git rev-parse --show-toplevel`) and
 the configured base (`branch.base`, default `origin/main`).
 
+> Section numbers below (`## 8`, `## 10`, `## 15`, `## 22`) refer to the canonical section list in
+> 1c. If the audited plan uses different section numbering, match by section **title**, not number.
+
 ### 3.1 - Base-SHA pin check
 
 The plan declares it was authored against base HEAD `<X>`. Probe current base:
@@ -285,7 +288,10 @@ high-risk; re-verify the migration slot + competing-PR list at every commit boun
 ### 3.2 - Conflicts-with scan
 
 ```bash
-ls <plans.dir>/*.md | grep -v -E 'MERGED|DELIVERED|SHIPPED|\.backup-' | xargs grep -l '<file in this plan>'
+# Active plans only: modified in the last 14 days, excluding shipped + backups, touching this plan's files.
+find <plans.dir> -name '*.md' -mtime -14 \
+  | grep -v -E 'MERGED|DELIVERED|SHIPPED|\.backup-' \
+  | xargs grep -l '<file in this plan>' 2>/dev/null
 ```
 
 For each plan modified within the last 14 days (no MERGED/DELIVERED/SHIPPED suffix) that touches
@@ -326,9 +332,13 @@ R2+ plans should declare an iter budget. Probe:
 ### 3.7 - Plan revisions log (R3, or any plan with `.backup-*` sibling)
 
 ```bash
-git -C <plans.dir> log --oneline -- <plan-file>
+git -C <plans.dir> log --oneline -- <plan-file> 2>/dev/null
 ls <plans.dir>/<plan-stem>.backup-*.md 2>/dev/null
 ```
+
+If `<plans.dir>` is not a git repo (the `git log` probe errors), skip the git-history cross-check and
+rely on the in-plan `## 22. Plan revisions` log plus any `.backup-*` sibling; a non-git plans dir is
+not itself a finding.
 
 If >1 commit OR a backup sibling exists → require `## 22. Plan revisions` entries explaining each
 revision (scope change, decision flip, base-SHA refresh).

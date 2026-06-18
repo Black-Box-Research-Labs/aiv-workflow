@@ -301,6 +301,28 @@ Pairs with the multi-environment-probe slot operation if the project has more th
   pass: every code symbol/path referenced in the changed docs still exists
 ```
 
+### e2e-harness
+
+```
+[N] COST MODEL DOCUMENTED
+  check: PR body (or {{RUNBOOK_PATH}}) states the per-run + projected recurring cost of the harness (runner minutes, external-service calls, storage)
+  pass: cost section present with a concrete number, not "TBD"
+
+[N] FAILURE-NOTIFICATION DEMONSTRATED
+  check: PR body includes evidence of an induced failure routing to the configured notification surface ({{NOTIFY_CHANNEL}})
+  pass: >=1 captured notification from a deliberately-failed run
+
+[N] TRIGGER SURFACE WIRED
+  cmd: grep -nE "{{TRIGGER_PATTERN}}" {{HARNESS_CONFIG}}
+  pass: >=1 match showing the harness fires on its intended trigger (schedule / event / manual dispatch)
+
+[N] SECRET-NEVER-COMMITTED
+  cmd: git log -S '{{SECRET_TOKEN_NAME}}' {{BRANCH}}...
+  pass: 0 hits (the secret is referenced only by env/secret-store name, never as a literal value)
+```
+
+`{{NOTIFY_CHANNEL}}` and `{{TRIGGER_PATTERN}}`/`{{HARNESS_CONFIG}}` come from the project's facts/config. The SECRET-NEVER-COMMITTED check substitutes `{{SECRET_TOKEN_NAME}}` with each secret the harness consumes (run once per secret).
+
 ---
 
 ## Flags (flag-bound slots)
@@ -508,7 +530,7 @@ POST-MERGE:
 3. **Brief Gates-to-Contract VERIFY parity** - count of brief Gates ~ count of VERIFY items (off-by-one tolerated for "operator AskUserQuestion" being implicit in the brief).
 4. **Operator decisions-to-AskUserQuestion list** - every `## You decide` bullet appears in `## When to AskUserQuestion`.
 5. **Out-of-scope follow-up pins** - every brief `## Out-of-scope` bullet has `-> {{REF}}` to another PR ID, stage, or issue #. Bare deferrals fail lint.
-6. **PRE-MERGE gate-graph** - class in {ui-render, observability} => PRE-MERGE has the split-gate pattern. Class in {cluster-issues, test-debt with >=30 commits} => the AskUserQuestion condition-list mentions "post-categorization + per-category strategy approved" or equivalent.
+6. **PRE-MERGE gate-graph** - class in {ui-render, observability} => PRE-MERGE has the split-gate pattern. Flag `cluster-issues` set OR class `test-debt` with >=30 commits => the AskUserQuestion condition-list mentions "post-categorization + per-category strategy approved" or equivalent.
 7. **POST-MERGE 4-section coverage** - bookkeeping AND unblock AND triggers AND retro-verify present. Sections marked N/A pass lint; omitted sections fail.
 8. **Branch name shape** - the substituted `branch.pattern` value appears IDENTICALLY in the brief Worktree+branch section and the contract F3 (NO-ATTRIBUTION) slot.
 9. **Substrate via the tool** - the F2 packet slot calls `aiv.check_cmd` (no restated spec rule). F4 references only configured `review.*` paths; if neither `review.spec_sections.progress_tracker` nor `review.coord_file` is set, F4 is dropped with a note (not a hard fail).
@@ -538,5 +560,6 @@ During Phase 2 (Classify), validate the class binding produced a slot count + st
 | test-debt | floor + 4-5 | root-cause categorization (not by-file); brittle-pin policy |
 | observability | floor + 4 | heartbeat/emit slot; live-fire stream-stays-open; split PRE-MERGE |
 | docs | floor + 2-3 | source-of-truth boundary; links resolve |
+| e2e-harness | floor + 4 | cost model; failure-notification demonstrated; trigger wired; secret-never-committed |
 
 A binding that produces a slot count well outside the expected band is a signal to recheck the class tag or the flags.

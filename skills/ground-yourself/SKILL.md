@@ -11,7 +11,7 @@ This skill has two modes. **Pick the right one based on what the user actually a
 > `$AIV_WORKFLOW_CONFIG`). Keys used: `docs.architecture` (the project's architecture / design doc,
 > default `docs/ARCHITECTURE.md`), `review.spec_sections` (map of named §-sections this skill can
 > point at, default empty), `ci.local_replica_cmd` / `ci.test_cmd` / `ci.e2e_cmd` (the project's CI
-> gates), `aiv.cli` (default `aiv`), `memory.dir` (default auto). If the file is absent, use these
+> gates), `memory.dir` (default auto). If the file is absent, use these
 > defaults and say so.
 
 ## Mode selection

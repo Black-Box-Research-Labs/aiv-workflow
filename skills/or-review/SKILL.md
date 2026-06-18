@@ -11,7 +11,7 @@ You are an **independent one-shot review agent**. Your filesystem is read-only i
 > via `$AIV_WORKFLOW_CONFIG`). Keys used: `aiv.cli` (default `aiv`), `aiv.check_cmd` (default
 > `aiv check`), `aiv.packets_dir` (default `.github/aiv-packets`), `aiv.spec_path`, `memory.dir`
 > (default `auto`), `memory.index` (default `MEMORY.md`), `review.spec_sections.progress_tracker`,
-> `review.spec_sections.iteration`, `review.coord_file`, `review.contracts_dir` (default `TEMP`),
+> `review.spec_sections.iteration`, `review.coord_file`, `review.contracts_dir` (default `.aiv/launch-briefs`),
 > `merge.strategy` (default `rebase`). If the file is absent, use these defaults, auto-detect what
 > you can (repo root, project name, memory dir), and say which defaults you fell back to. A missing
 > optional binding (e.g. no `review.coord_file`) disables that sub-check with a one-line note in the
@@ -56,10 +56,10 @@ Count prior orchestrator-review comments (header match per `protocol.md`) -> `R 
 
 ### Stage 3 - Locate or derive the contract (3-mode dispatch)
 
-Search for a per-PR completion contract under the configured contracts dir (`review.contracts_dir`, default `TEMP`). Use the PR title slug and branch name as keys:
+Search for a per-PR completion contract under the configured contracts dir (`review.contracts_dir`, default `.aiv/launch-briefs`). Use the PR title slug and branch name as keys:
 
 ```bash
-CONTRACTS_DIR="<review.contracts_dir, default TEMP>"
+CONTRACTS_DIR="<review.contracts_dir, default .aiv/launch-briefs>"
 TITLE_SLUG=$(gh pr view <N> --json title --jq '.title' | tr ' ' '-' | tr '[:upper:]' '[:lower:]')
 BRANCH=$(gh pr view <N> --json headRefName --jq '.headRefName')
 find "$CONTRACTS_DIR" -name '*completion-contract.md' 2>/dev/null | grep -iE "(${TITLE_SLUG}|${BRANCH})" | head -1

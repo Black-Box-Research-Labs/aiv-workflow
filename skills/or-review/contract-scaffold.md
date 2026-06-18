@@ -1,7 +1,7 @@
 # Contract scaffold (SCAFFOLD MODE fallback)
 
 Used when no per-PR `*-completion-contract.md` exists under the contracts dir (`review.contracts_dir`,
-default `TEMP`) AND derivation produced too little signal. Verification is softer - items are marked
+default `.aiv/launch-briefs`) AND derivation produced too little signal. Verification is softer - items are marked
 `?` instead of failed when not mechanically checkable from PR metadata + diff alone.
 
 The posted comment in SCAFFOLD MODE MUST begin with this warning line:

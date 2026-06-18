@@ -110,7 +110,7 @@ For each class, audit against the spec's definition (resolve the exact criteria 
 - **C - Negative** (when the spec requires it at this tier). Is the search scope explicitly declared (paths/modules/patterns)? Is the method deterministic (tool + version + config)? Are patterns enumerated, not "checked for issues"? A common miss: a grep/typo sweep was done in-session but its invocation/output was never captured.
 - **D - Differential** (when required). Is there differential evidence for *each* surface category touched (API, deps, schema, config, security), not just one? Are diffs bound to both base and head SHA? Are raw artifacts present, not only inline summaries?
 - **E - Intent.** Is the requirement reference immutable per the spec (commit-SHA-bound spec-in-repo, hashed snapshot, version-tagged issue)? Common miss: a plan/design doc in an operator's home dir or a "live-prod screenshot" cited with no hash and no immutable URL.
-- **F - Provenance** (when required). Is there at least one cryptographic provenance mechanism (signed commit, CI OIDC attestation, SLSA predicate, notarization), bound to the packet's head SHA? Are SHA-256 hashes recorded for the cited artifacts? Bare git commit SHAs prove commit integrity but not evidence-artifact integrity.
+- **F - Provenance** (when required). Is there at least one cryptographic provenance mechanism (signed commit, CI OIDC attestation, SLSA predicate, notarization), bound to the packet's head SHA? Are SHA-256 hashes recorded for the cited artifacts? Bare git commit SHAs prove commit integrity but not evidence-artifact integrity. Absent a signing substrate in the repo, the defensible state is a sha256 manifest of the cited artifacts plus an honest, falsifiable N/A rationale for cryptographic provenance (consistent with the all-class mandate) - so do not fire a hard Class F finding when no signing infra exists; record it as the satisfied N/A-with-manifest case instead.
 
 Distinguish **BLOCK** vs **WARN** strictly per the spec's severity column. Do not escalate WARNs to BLOCKs or vice versa.
 
@@ -254,6 +254,14 @@ against the spec at `<aiv.spec_path>` (version <X>).
 - **Distinguish BLOCK vs WARN** per the spec's severity column. Never re-grade.
 - **Always offer the exception path.** The spec permits documented exceptions for a reason. Audit ≠ block-merge.
 - **Read-only.** Never amend packets, never comment-merge, never close the PR. Output is a single PR comment. The operator decides whether to remediate.
+
+## Calibration - finding-ID density and tone (synthetic)
+
+Match this synthetic, project-agnostic example for tone and finding density (do NOT treat it as a real audit; resolve actual IDs from `aiv.spec_path`):
+
+> A PR ships N packets all self-declared at the lowest risk tier. One commit edits an access-control allowlist. That single edit fires a tier-misclassification finding (the change touches the authorization surface, so the spec mandates the top tier), which cascades into the missing Class C (negative-search) and Class F (provenance) the top tier requires. Net: about 5 findings - the tier misclassification (load-bearing), the two cascaded class gaps, plus a mutable Class E reference and a SHA-unbound Class D diff. Harvest the resolvable ones (compose the SHA-bound diff, re-run the declared grep, build the sha256 manifest); leave the tier decision to the operator.
+
+Aim for that level: one load-bearing finding plus the handful it cascades into, each tied to a specific packet/claim with the spec's own finding ID, and the collectible gaps harvested rather than merely listed.
 
 ## Safety rails
 

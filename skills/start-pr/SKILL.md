@@ -105,8 +105,10 @@ do not auto-clean.
 
 Resolve the plan from `plans.dir` (default `~/.claude/plans`) in this order:
 
-1. **Active slot first:** the most-recently-modified plan file in `plans.dir`. Read its title line -
-   does it match the PR being started? If yes, use it.
+1. **Active slot first:** resolve `plans.active_slot` (default `auto`). When it is set to a path, that
+   file is the active slot; when `auto`, fall back to the most-recently-modified plan file in
+   `plans.dir` (a named slot beats mtime, since a stray edit can re-stamp the wrong file). Read its
+   title line - does it match the PR being started? If yes, use it.
 2. **Named PR plan:** a plan file whose name encodes this PR's stage/slug. If one exists and matches,
    prefer it over the active slot.
 3. **No matching plan:** propose entering plan mode before any code change. Do NOT proceed without a

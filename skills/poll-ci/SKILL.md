@@ -9,6 +9,7 @@ You are watching a PR's CI checks until they finish, then reading the code-revie
 
 > **Config.** Read `.aiv-workflow.yml` at the repo root (`git rev-parse --show-toplevel`; override via
 > `$AIV_WORKFLOW_CONFIG`). Keys used: `ci.local_replica_cmd` (the pre-push replica command),
+> `ci.expected_wallclock` (the bound-the-wait anchor; if unset, ~15 min),
 > `merge.strategy` (default `rebase`), `merge.delete_branch` (default `true`), `merge.autonomous`
 > (MUST be `false`). If the file is absent, use these defaults and say so.
 
@@ -55,7 +56,7 @@ gh pr checks <N> --watch --interval 30 --fail-fast
 
 **A `--watch` can hang forever - bound the wait; never let a backgrounded watch be your only signal:**
 - `--watch` returns only when checks reach a **terminal** state. A check stuck `pending` - queued behind a saturated runner pool, or a **wedged** self-hosted runner (`busy=true` with `0 in_progress` per `gh api repos/<o>/<r>/actions/runners`) - **never goes terminal**, so a backgrounded watch (especially **without `--fail-fast`**, which waits for *all* checks) can block **indefinitely** while the jobs you care about already failed or passed. This can burn hours: the watch sits on a `pending` aggregate check while the real test jobs long ago finished red.
-- **Bound it.** If a backgrounded watch has not notified within roughly the expected job wall-clock, **stop waiting and take a direct snapshot** - `gh pr checks <N>` for the rollup, and `gh api repos/<o>/<r>/actions/jobs/<job-id>` for step-level state even while the parent run is still in progress. On self-hosted runners individual jobs finish while a sibling/aggregate check stays `pending`, so "all-terminal" may never arrive.
+- **Bound it.** If a backgrounded watch has not notified within roughly `ci.expected_wallclock` (if that key is unset, ~15 min), **stop waiting and take a direct snapshot** - `gh pr checks <N>` for the rollup, and `gh api repos/<o>/<r>/actions/jobs/<job-id>` for step-level state even while the parent run is still in progress. On self-hosted runners individual jobs finish while a sibling/aggregate check stays `pending`, so "all-terminal" may never arrive.
 - **Default to `--fail-fast`** for backgrounded watches so the first red is the notification. Reserve no-fail-fast full-completion watches for when you have already confirmed the runners are healthy and draining - otherwise you are betting on an exit that may not come.
 - **Check the runner fleet when checks sit at `pending 0s`.** `gh api repos/<o>/<r>/actions/runners` (online/busy) + `gh run list --status in_progress|queued`. Both runners `busy=true` with `0 in_progress` = a hung/orphaned job is wedging the slots; `ps -Ao pid,etime,command | grep _work` on the self-hosted box shows whether a `Runner.Worker` is genuinely running vs stuck. Surface this - it is infra, not the PR - and don't keep re-watching a wedged pool.
 
@@ -85,8 +86,10 @@ The human is the merge gate - `merge.autonomous` is `false` and must stay false.
    ```bash
    gh pr merge <N> --rebase --delete-branch
    ```
-   The strategy flag comes from `merge.strategy` (squash is forbidden - atomic commits must land on
-   main as-is); add `--delete-branch` only when `merge.delete_branch` is `true`.
+   Rebase is the only permitted strategy: squash is forbidden so atomic commits land on main as-is.
+   The `merge.strategy` key exists to fail-loud - if a project sets it to anything other than `rebase`,
+   stop and surface that rather than honoring it. Add `--delete-branch` only when `merge.delete_branch`
+   is `true`.
 
 ### 3b. ANY RED
 

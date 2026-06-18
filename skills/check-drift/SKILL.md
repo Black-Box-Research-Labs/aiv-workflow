@@ -13,7 +13,8 @@ The skill bundles four phases because the operator naturally wants all of them b
 > `memory.dir` (default `auto`), `memory.index` (default `MEMORY.md`),
 > `review.spec_sections.{progress_tracker,iteration}` (default blank), `review.coord_file`,
 > `branch.base` (default `origin/main`), `ci.local_replica_cmd`, `aiv.cli` (default `aiv`),
-> `quality.code_health_cmd` (default blank - skip the code-health sub-check),
+> `quality.code_health_cmd` (default blank - skip the per-file code-health sub-check),
+> `quality.code_health_changeset_cmd` (default blank - skip the branch-level code-health sub-check),
 > `quality.coverage_floor` (default blank - skip the explicit ratchet floor).
 
 **Calibration source:** the project's own plan corpus under the configured plans dir (`plans.dir`,
@@ -81,7 +82,11 @@ Default reference when none is named - match the plan's R-tier against `plans.ar
 | R0 | `plans.archetypes.R0` |
 | R1 | `plans.archetypes.R1` |
 | R2 | `plans.archetypes.R2` |
+| R2 follow-up / closure / amendment | `plans.archetypes.R2_followup` (when blank, tier to R2 → `plans.archetypes.R2`) |
 | R3 | `plans.archetypes.R3` |
+
+A follow-up / closure / amendment plan tiers to `plans.archetypes.R2_followup`; when that key is
+blank, fall back to the R2 archetype (`plans.archetypes.R2`).
 
 If the matched archetype key is blank (the default), **disable structural-drift-vs-reference for
 this run** and say so in one line: `1b: no R<N> archetype configured (plans.archetypes.R<N> blank) -
@@ -200,9 +205,16 @@ a threshold-crossing drop blocks merge; fix in-PR.
 | `path/to/new.ts` | n/a (new) | n/a - measure post-first-commit | present Phase Z |
 | `path/to/refactor.ts` | 7.8 / 1 RED | MISSING | MISSING - add before B0 |
 
-**Tooling:** run the configured code-health command (`quality.code_health_cmd`). If it is blank (the
-default), **skip this sub-check** and say so in one line: `2.5: no code-health tool configured
-(quality.code_health_cmd blank) - skipped.` Where a code-health tool flags only structural smells, it
+**Tooling (per-file):** run the configured per-file code-health command (`quality.code_health_cmd`).
+If it is blank (the default), **skip this sub-check** and say so in one line: `2.5: no per-file
+code-health tool configured (quality.code_health_cmd blank) - skipped.`
+
+**Tooling (branch-level pre-PR):** run the configured change-set code-health command
+(`quality.code_health_changeset_cmd`) for a branch/change-set-level review before opening the PR. If
+it is blank (the default), **skip this sub-check** and say so in one line: `2.5: no change-set
+code-health tool configured (quality.code_health_changeset_cmd blank) - skipped.`
+
+Where a code-health tool flags only structural smells, it
 will miss content-level and concurrency-semantic bugs; pair it with the bug-catalog (2.1), never gate
 on code-health alone.
 

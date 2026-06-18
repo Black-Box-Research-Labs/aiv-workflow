@@ -94,6 +94,8 @@ For each falsifiable property the change establishes, write:
 | **F** Provenance | address | "full provenance pending signing infra - sha256 manifest supplied" |
 | **G** Cognitive | **EXCLUDED** (`evidence.exclude_classes`, default `[G]`) | omit; automating a before-reading prediction is gaming. Re-enters only when the operator's scalability work lands. |
 
+When Class G is re-enabled, the sanctioned predict-before-review path is `aiv.svp_cmd` (default `aiv svp`, the predict/probe/trace/falsify sub-app), and the prediction must be timestamped BEFORE reading the implementation; otherwise it is gaming.
+
 **The risk tier no longer gates which classes APPEAR.** It now gates two other things: (1) which class *content rules* the validator fires (`aiv.check_cmd` still applies the stricter C/E/B-line-anchor rules at higher tiers), and (2) the human judge's scrutiny budget at the end (high-R → judged hard; low-R → skimmed over a uniform packet). The **behavioral** artifacts for Class A and D are captured by the `prove-it` evidence engine BEFORE you draft - `prove-it` runs the composed system, captures screenshots / traces / before-after dumps, and hashes them; **this skill *formats* what that engine captured, it does not re-run the app.** Run `prove-it` first, then drop its paste-ready blocks into the sections below.
 
 **Class quality requirements (the parts most often skipped) - see the per-class sections of `aiv.spec_path` for the normative rules:**
@@ -144,6 +146,8 @@ Required sections (in this order):
 ```
 
 `aiv check` is THE validator (there is no separate `guard` CLI). It confirms the packet's *shape* - required headers, class presence, line anchors at the right tier. Your job in this skill is that the evidence is *real*; let the tool confirm the structure. The `§N.` numbers above are logical labels for your benefit; type the literal headers the validator expects and let it tell you if you missed one.
+
+The all-class shape is an authoring convention enforced by review today; making `aiv check` REQUIRE C/D/F at all tiers (and accept N/A) is a separate protocol change that must migrate every in-flight packet, so it is not assumed here.
 
 **Progressive workflow:** at commit-time, markdown-only is fine. Commit-SHA placeholders are allowed and replaced with real SHAs at PR-time. CI run links can be placeholders pre-push, tightened post-CI.
 

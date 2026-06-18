@@ -48,7 +48,7 @@ gh pr view <N> --json comments \
 | Agent attribution (`Co-Authored-By:` an agent) in any commit | FAIL + halt; report in synthesis |
 | 4a-4d falsifies a load-bearing contract claim | FAIL + populate the discrepancies section |
 | Patch in the diff without a matching PR-body explanation | FAIL (investigation-honesty); report in Angle 1 |
-| The CR-quiet-window is broken (the latest CodeRabbit review was submitted within the window) | WARN (not FAIL) |
+| The CR-quiet-window is broken (the latest automated-review comment was submitted within `review.cr_quiet_window` (default 6h)) | WARN (not FAIL) |
 
 A FAIL verdict does NOT block posting the comment - the operator needs the findings. It blocks the recommendation from saying "ready to merge."
 

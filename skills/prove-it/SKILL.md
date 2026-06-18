@@ -126,8 +126,8 @@ artifact OR a one-line **falsifiable N/A rationale** - never an empty section, n
 | **E** Intent | the cited finding/issue ref, immutable | "intent = finding `<ref>`; immutable at SHA `<x>`" |
 | **F** Provenance | `sha256` manifest of all artifacts above | "full provenance pending signing infra; sha256 manifest supplied" |
 
-Validate the resulting packet through the tool, not by eye: `<aiv.cli> check <packet>` (the project's
-configured `aiv.check_cmd`). Let the protocol tool confirm shape; your job is that the evidence is
+Validate the resulting packet through the tool, not by eye: run the project's configured
+`aiv.check_cmd` (default `aiv check`) against the packet. Let the protocol tool confirm shape; your job is that the evidence is
 *real*.
 
 > **GATE 4:** Every class A-F has either a real artifact or a falsifiable N/A line? Zero empty

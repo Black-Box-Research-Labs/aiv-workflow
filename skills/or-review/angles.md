@@ -94,7 +94,7 @@ Every sub-agent prompt MUST begin with the read-only guardrail:
 > Then audit:
 > - Coordination file (`review.coord_file`, if configured) - is this PR's row present and its checkpoint transitions reflected? If `review.coord_file` is blank, note "no coordination file configured - skipped."
 > - Progress-tracker closure annotation (in `aiv.spec_path` at `review.spec_sections.progress_tracker`) in the final commit, if the PR claims to close tracker items.
-> - CR-quiet-window - `gh pr view {{PR_NUMBER}} --json reviews --jq '.reviews[-1] | {submittedAt, body: .body[:200]}'`. **Read the CR body, not just the status** - a "success" status is not "no findings." If a CR review fired recently, flag the window.
+> - CR-quiet-window - `gh pr view {{PR_NUMBER}} --json reviews --jq '.reviews[-1] | {submittedAt, body: .body[:200]}'`. **Read the CR body, not just the status** - a "success" status is not "no findings." If a CR review fired within `review.cr_quiet_window` (default 6h), flag it.
 >
 > Memory entries to honor for this PR (universal principles always; project-specific lessons only if the host project's memory carries them):
 > {{MEMORY_LIST}}

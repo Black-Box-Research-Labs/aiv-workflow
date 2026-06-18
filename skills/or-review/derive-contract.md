@@ -57,7 +57,7 @@ gh pr diff <N>
 # 4. Wave / cross-PR coordination doc, if the project keeps one (review.coord_file or a
 #    coordination doc under the contracts dir)
 [ -n "<review.coord_file>" ] && cat "<review.coord_file>"
-find "<review.contracts_dir, default TEMP>" -name '*coordination*.md' 2>/dev/null
+find "<review.contracts_dir, default .aiv/launch-briefs>" -name '*coordination*.md' 2>/dev/null
 
 # 5. Plan slot (if present in the configured plans dir)
 ls <plans.dir>/pr-*.md 2>/dev/null | grep -iE "<title-slug>"
@@ -97,7 +97,7 @@ emitted as `N/A (not configured)`.
 
 [X+4] CR-QUIET-WINDOW
   cmd: gh pr view <N> --json reviews --jq '.reviews[-1] | (.body[:120] + " | submittedAt=" + .submittedAt)'
-  pass: latest CR review body shows no actionable comments AND was submitted before the quiet window;
+  pass: latest CR review body shows no actionable comments AND was submitted more than `review.cr_quiet_window` (default 6h) ago;
         read the BODY, not just the status.
 ```
 
@@ -290,7 +290,7 @@ The review uses confidence to set probe behavior:
 
 ## Output handling
 
-After deriving, write to `<review.contracts_dir, default TEMP>/<derived-pr-slug>-completion-contract-DERIVED.md`.
+After deriving, write to `<review.contracts_dir, default .aiv/launch-briefs>/<derived-pr-slug>-completion-contract-DERIVED.md`.
 The `-DERIVED` suffix flags it as machine-generated. The skill continues to Stage 4 using this file
 as its STRICT-mode contract. If the operator later edits the file (removing the `-DERIVED` suffix),
 the next `/or-review` run picks it up as a true STRICT contract.

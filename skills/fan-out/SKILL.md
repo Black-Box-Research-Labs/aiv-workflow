@@ -21,6 +21,8 @@ Use for questions where multiple lenses reveal more than one deep search. NOT fo
 - "Verify the claims in this design doc against actual code"
 - "What do we know about Z from spec / code / tests / memory?"
 
+**Principle.** Multi-entity research (N people / repos / files) is a per-entity fan-out: one sub-agent per entity, not one agent looping over all of them. And a research deliverable is SAVED to a file, not dumped into chat.
+
 ## The protocol
 
 ### 1. Decompose the question into N angles (3-7)
@@ -89,7 +91,7 @@ Report in the user's terms, not agent-output terms.
 ## Anti-patterns
 
 - **Firing agents sequentially.** Use one message with N Agent tool calls.
-- **Announcing verification, then skipping it.** This happens reliably under real usage. The 4a-4d checklist exists to force it through.
+- **Announcing verification, then skipping it.** Verified in 3 of 3 real cases this happens. The 4a-4d checklist exists to force it through.
 - **Stopping at the N angles the user named.** Always add the "what else" catch-all.
 - **Reporting raw agent summaries.** Synthesize into a single answer.
 - **Synthesizing from FALSIFIED claims.** If 4c marks something falsified, the synthesis can't include it as fact.

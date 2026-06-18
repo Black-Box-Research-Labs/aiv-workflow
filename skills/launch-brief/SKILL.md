@@ -19,6 +19,7 @@ Both are derived from the operator's scope intent. The brief tells the agent *wh
 >   extend it to add classes whose slot bundles live in `CONTRACT-TEMPLATE.md`.
 > - `branch.pattern` (default `feat/{stage}-pr-{slug}-{brief}`) - branch the implementing agent will create.
 > - `branch.base` (default `origin/main`).
+> - `branch.worktree_pattern` - the worktree location the start-PR ritual creates; referenced in the brief's Worktree+branch section.
 > - `aiv.cli` (default `aiv`) + `aiv.check_cmd` (default `aiv check`) + `aiv.packets_dir`
 >   (default `.github/aiv-packets`) - the AIV substrate; the contract's verification floor calls these.
 > - `ci.local_replica_cmd`, `ci.test_cmd` (default `npx vitest run`), `ci.e2e_cmd`

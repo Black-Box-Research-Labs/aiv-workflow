@@ -35,11 +35,13 @@ evidence:
 # ── Plans (check-drift, start-pr). ──
 plans:
   dir: ~/.claude/plans
+  active_slot: auto              # the plan slot start-pr treats as active; auto = most-recently-modified in dir
   # Tier-matched reference plans for check-drift Phase 1 structural drift. Omit/blank to disable refs.
   archetypes:
     R0: ""
     R1: ""
     R2: ""
+    R2_followup: ""             # closure/amendment plans (sibling of R2); blank -> tier to R2
     R3: ""
 
 # ── Memory (start-pr, launch-brief, check-drift cite these). ──
@@ -67,6 +69,7 @@ ci:
   local_replica_cmd: ""          # REQUIRED for the pre-push gate; run before every push
   test_cmd: "npx vitest run"
   e2e_cmd: "npx playwright test"
+  expected_wallclock: ""         # typical CI wall-clock (e.g. "15m"); poll-ci's bound-the-wait heuristic
   checks: {}                     # extra named check commands
 
 # ── prove-it behavioral-evidence capture. ──
@@ -82,6 +85,7 @@ review:
     iteration: ""                # e.g. "§13.5"
   coord_file: ""                 # multi-PR coordination doc, if any
   contracts_dir: .aiv/launch-briefs   # where or-review finds completion contracts (match launch_brief.out_dir)
+  cr_quiet_window: "6h"          # how long since the last automated-review comment before treating it as quiet/converged
 
 # ── Merge (poll-ci, the merge gate). ──
 merge:
@@ -95,7 +99,8 @@ docs:
 
 # ── Code-health + coverage (check-drift §2.5/§2.2c). Blank disables the sub-check. ──
 quality:
-  code_health_cmd: ""            # configured code-health tool (e.g. CodeScene); blank -> skip
+  code_health_cmd: ""            # per-file code-health scorer (e.g. CodeScene); blank -> skip
+  code_health_changeset_cmd: ""  # branch/change-set-level code-health review; blank -> skip that sub-check
   coverage_floor: ""             # coverage ratchet floor (e.g. "15/15/21/14%"); blank -> no numeric target
 
 # ── Audit output (rigor-audit). ──
@@ -106,4 +111,4 @@ audit:
 launch_brief:
   out_dir: .aiv/launch-briefs    # brief + completion contract written here (match review.contracts_dir)
   # Default project-agnostic class set; extend per project.
-  pr_classes: [migration, ui-render, dispatcher, refactor, schema-additive, infrastructure, test-debt, observability, docs]
+  pr_classes: [migration, ui-render, dispatcher, refactor, schema-additive, infrastructure, e2e-harness, test-debt, observability, docs]

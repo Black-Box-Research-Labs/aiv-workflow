@@ -62,7 +62,7 @@ Hypothesis ranking + diagnostic evidence -> AskUserQuestion thread + operator co
 
 ## Worktree + branch
 
-The start-PR ritual creates the worktree on `{{BRANCH}}` (from `branch.pattern`) off `{{BASE}}` (`branch.base`, default `origin/main`).{{#if CLUSTER_SIBLINGS}} Coordinate with {{SIBLING_LIST}} via the coord file - file hot zones {{HOT_ZONE_STATUS}}.{{/if}}
+The start-PR ritual creates the worktree at `{{WORKTREE_PATH}}` (from `branch.worktree_pattern`) on `{{BRANCH}}` (from `branch.pattern`) off `{{BASE}}` (`branch.base`, default `origin/main`).{{#if CLUSTER_SIBLINGS}} Coordinate with {{SIBLING_LIST}} via the coord file - file hot zones {{HOT_ZONE_STATUS}}.{{/if}}
 
 ## Gates (binary)
 

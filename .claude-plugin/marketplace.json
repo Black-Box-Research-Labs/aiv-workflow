@@ -1,0 +1,16 @@
+{
+  "name": "black-box-research-labs",
+  "owner": {
+    "name": "Black Box Research Labs"
+  },
+  "description": "Black Box Research Labs plugins for AIV-verified, agent-driven development.",
+  "plugins": [
+    {
+      "name": "aiv-workflow",
+      "source": "./",
+      "description": "Agent workflow layer over the AIV protocol: 11 skills driving audit-finding to merge with self-verification gates.",
+      "version": "0.1.0",
+      "keywords": ["aiv", "verification", "agent-workflow"]
+    }
+  ]
+}

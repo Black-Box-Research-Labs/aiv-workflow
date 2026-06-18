@@ -1,0 +1,81 @@
+# aiv-workflow per-project config
+#
+# Copy to  <repo-root>/.aiv/workflow.config.yml  and edit.
+# Skills read this file at the start of a run (path overridable via $AIV_WORKFLOW_CONFIG).
+# Every key has a documented default; delete a key to accept its default.
+# "auto" means the skill derives the value at runtime (usually from git).
+
+schema: 1
+
+project:
+  # Human name (banners, memory slug). Default: basename of repo_root.
+  name: auto
+  # Repo root. "auto" = `git rev-parse --show-toplevel`.
+  repo_root: auto
+
+# ── Binding to aiv-protocol (Layer 1). Skills CALL this; they never reimplement the spec. ──
+aiv:
+  cli: aiv                                    # aiv-protocol CLI, expected on PATH
+  spec_path: aiv-protocol/SPECIFICATION.md    # canonical spec (submodule or vendored copy)
+  packets_dir: .github/aiv-packets            # where verification packets live
+  evidence_dir: .github/aiv-packets/evidence  # prove-it writes behavioral artifacts here
+  guard_cmd: "aiv guard"                       # packet/evidence validator invocation
+  init_cmd: "aiv init"                          # AIV-ify a not-yet-enabled project (start-pr runs this)
+
+# ── All-class evidence mandate (Layer-2 authoring convention; CI enforcement lives in aiv-protocol). ──
+evidence:
+  mandate_all_classes: true       # every packet addresses A-F
+  exclude_classes: [G]            # G omitted until scalable (automating it = gaming)
+  na_requires_rationale: true     # a vacuous class section fails the same bar as a missing one
+
+# ── Plans (check-drift, start-pr). ──
+plans:
+  dir: ~/.claude/plans
+  # Tier-matched reference plans for check-drift Phase 1 structural drift. Omit/blank to disable refs.
+  archetypes:
+    R0: ""
+    R1: ""
+    R2: ""
+    R3: ""
+
+# ── Memory (start-pr, launch-brief, check-drift cite these). ──
+memory:
+  dir: auto          # auto = ~/.claude/projects/<encoded-repo-root>/memory
+  index: MEMORY.md
+
+# ── Branch + worktree conventions (start-pr, launch-brief). ──
+branch:
+  # Substituted by the skills: {stage} {slug} {brief}
+  pattern: "feat/{stage}-pr-{slug}-{brief}"
+  # {root_parent} = dirname(repo_root); {project} = project.name; {slug} = PR slug
+  worktree_pattern: "{root_parent}/{project}-pr-{slug}"
+  base: origin/main
+  # Commands run after `git worktree add` (project pre-flight). Optional; omit if none.
+  postcreate:
+    - "git submodule update --init --recursive"
+
+# ── CI (poll-ci, the push gate, prove-it). ──
+ci:
+  local_replica_cmd: ""          # REQUIRED for the pre-push gate; run before every push
+  test_cmd: "npx vitest run"
+  e2e_cmd: "npx playwright test"
+  checks: {}                     # extra named check commands
+
+# ── prove-it behavioral-evidence capture. ──
+prove_it:
+  browser_runner: playwright     # playwright | none
+  render_cmd: ""                 # command that renders a static operator-facing view to PNG
+  cli_capture: true
+
+# ── Review (check-drift, or-review cite the project's doc structure). ──
+review:
+  spec_sections:                 # free-form; map the §s your skills reference
+    progress_tracker: ""         # e.g. "§15.3"
+    iteration: ""                # e.g. "§13.5"
+  coord_file: ""                 # multi-PR coordination doc, if any
+
+# ── Merge (poll-ci, the merge gate). ──
+merge:
+  strategy: rebase               # rebase only; squash forbidden
+  delete_branch: true
+  autonomous: false              # MUST stay false; the human is the merge gate

@@ -276,3 +276,21 @@ Aim for that level: one load-bearing finding plus the handful it cascades into, 
 - **A clean shape check is not a clean content check.** "Validator passed" means structurally valid, not that the evidence supports the claims. If the content audit comes back clean too, add the measurement dimension that would have caught a defect, then re-run.
 - **Self-containment is non-negotiable.** A packet that only makes sense as part of a forward-reference chain is not auditable in isolation, even if the chain eventually covers the claim.
 - **Even a PASS audit does not authorize merge.** This skill is read-only and produces findings; the human remains the merge gate. Never auto-merge on a clean audit.
+
+## Machine-checkable data (REQUIRED - append to the posted PR comment)
+
+Append this as the **last** `## Machine-checkable data` fenced block of the audit comment, so the
+orchestrator gates on JSON, not prose. It MUST agree with the findings above (a vacuous/empty class
+with no falsifiable N/A rationale is a blocking finding).
+
+```json
+{
+  "schema": "aiv_audit_result@1",
+  "packet_decision": "COMPLIANT|CONDITIONAL|NON-COMPLIANT",
+  "shape_check_passed": true,
+  "blocking_findings": [{"packet": "PACKET_x.md", "spec_finding_id": "AIV-...", "detail": "..."}],
+  "classes_vacuous_or_na_unjustified": []
+}
+```
+
+Gate: `packet_decision!=="NON-COMPLIANT" && blocking_findings.length===0 && shape_check_passed===true`.

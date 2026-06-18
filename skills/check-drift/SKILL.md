@@ -455,3 +455,27 @@ knowing. The promotion criterion remains: name the failure mode the section woul
 - **Pasting the full doc back at the user.** They have it; emit deltas + flags only.
 - **Reporting wording changes as substantive.** Costs trust.
 - **Skipping the survivorship-bias disclosure.** Honest epistemic hygiene is non-optional.
+
+## Machine-checkable data (REQUIRED - deterministic orchestrator gate)
+
+The Polymath Track orchestrator (`fix_pipeline.mjs`) gates Loop #1 on JSON, never prose. After the
+`=== OVERALL VERDICT ===` section, emit the verdict ALSO as the **last** `## Machine-checkable data`
+fenced block in your output. It MUST agree with the prose verdict.
+
+```json
+{
+  "schema": "check_drift_verdict@1",
+  "r_tier": "R0|R1|R2|R3",
+  "audit_depth_complete": true,
+  "structural_integrity": "pass|fail",
+  "plan_quality": "pass|partial|fail",
+  "plan_graph": "pass|partial|fail",
+  "hard_stops": [{"id": "Q2", "phase": "3.3", "detail": "what blocks B0"}],
+  "open_substantive_losses": 0,
+  "iteration": 1
+}
+```
+
+GATE #1 (`PLAN_CONVERGED`): `audit_depth_complete===true && structural_integrity==="pass" &&
+plan_quality!=="fail" && plan_graph!=="fail" && hard_stops.length===0`. A missing/invalid block is an
+outage → the orchestrator HALTs (outage ≠ pass).

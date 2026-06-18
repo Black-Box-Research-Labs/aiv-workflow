@@ -189,3 +189,30 @@ do not paste them.
 
 Neutral, evidence-first. Avoid praise ("great work") and editorializing ("this is concerning"). State
 findings, cite evidence, recommend action. Terse + actionable beats hedging.
+
+## Machine-checkable data (REQUIRED - append to the posted PR comment)
+
+Append this as the **last** `## Machine-checkable data` fenced block of the single PR comment, so the
+orchestrator reads the verdict as JSON (never the prose). It MUST agree with the header `Verdict`/`Contract`.
+
+```json
+{
+  "schema": "or_review_verdict@1",
+  "round": 1,
+  "head_ref_oid": "<headRefOid full sha>",
+  "verdict": "PASS|WARN|FAIL",
+  "contract_total": 0,
+  "contract_verified": 0,
+  "falsified_load_bearing": 0,
+  "unverified": 0,
+  "stop_condition_tripped": "none|no-verify|attribution|unexplained-patch",
+  "coderabbit_actionable": 0,
+  "aiv_classes_present": ["A","B","C","D","E","F"],
+  "aiv_classes_vacuous": []
+}
+```
+
+Terminator (Stage 12): `contract_verified===contract_total && verdict==="PASS" && unverified===0 &&
+falsified_load_bearing===0 && stop_condition_tripped==="none" && coderabbit_actionable===0 &&
+{A..F}⊆aiv_classes_present && aiv_classes_vacuous.length===0`, stable for N=2 rounds at the same
+`head_ref_oid` (any push resets the streak).

@@ -139,16 +139,35 @@ vs-reference diff is skipped.
 
 Run the audits the tier table calls for. Answer each in writing.
 
-### 2.1 - Design-tests coverage
+> **Commitment, not existence (governs every sub-check below).** check-drift runs in plan mode,
+> BEFORE design-tests, build, and prove-it. Any sub-check whose subject is an artifact those later
+> stages produce (a `.bug-catalog.md`, a written test, a captured evidence file, a CI run) must
+> verify the plan's **commitment to produce it** - the deliverable is named and assigned to a stage -
+> NOT the artifact's existence (which is impossible at plan time and would block every otherwise-
+> converged plan). The later stage's own gate enforces the physical artifact. A bare "we'll handle it"
+> with no named per-artifact commitment still fails.
 
-Critical files (NEW + MOD) checked for `.bug-catalog.md` companions.
+### 2.1 - Design-tests commitment (plan-time: commitment, not file existence)
 
-| File | Bug-catalog? | Plan to add? |
+check-drift runs in plan mode, BEFORE the build. A `<file>.bug-catalog.md` companion is produced
+later by the `design-tests` skill, so it cannot exist yet at the plan gate. So 2.1 verifies the plan
+**commits** to bug-catalog-first design-tests for each NEW/MOD critical file: the test-strategy /
+acceptance sections name the per-file `<path>.bug-catalog.md` deliverable and state that
+`design-tests` will produce it. It does NOT require the file to exist now (that is enforced later, at
+the design-tests gate).
+
+For each NEW/MOD critical file:
+
+| File | Per-file bug-catalog commitment in the plan? | 2.1 verdict |
 |---|---|---|
-| `path/to/file.ts` | present at `<path>.bug-catalog.md` | n/a |
-| `path/to/new.ts` | not yet | planned in Phase X / MISSING |
+| `path/to/file.ts` | names `<path>.bug-catalog.md` + says design-tests produces it | PASS (file N/A at plan time) |
+| `path/to/new.ts` | only "we'll write tests"; no per-file commitment | FAIL - add the per-file bug-catalog commitment |
 
-Don't accept "we'll write tests" as a substitute. The standard is bug-catalog-first.
+A plan that names a per-file bug-catalog commitment PASSES 2.1, and the physical file is N/A here (it
+is produced at the design-tests stage and does not count against convergence). A plan that merely says
+"we'll write tests" with no per-file commitment still FAILS. Bug-catalog-first remains the standard:
+at the plan gate it is a *commitment* requirement; at the design-tests gate it becomes a *file*
+requirement.
 
 ### 2.2 - Testability split (three sub-checks)
 
@@ -384,7 +403,7 @@ SUBSTANTIVE ADDITIONS (N): §<section> - <what was added>
 
 === PHASE 2: PLAN-QUALITY ===
 
-2.1 DESIGN-TESTS COVERAGE: <table>
+2.1 DESIGN-TESTS COMMITMENT: <table> (per-file bug-catalog commitment; file N/A at plan time)
 2.2a VERIFICATION MATRIX: <present | flat checklist instead | n/a>
 2.2b ACCEPTANCE vs VERIFICATION: <distinct | collapsed>
 2.2c TEST LAYERS: <A present, B present, C MISSING - flag: DB writes need Layer B | …>
@@ -444,7 +463,7 @@ knowing. The promotion criterion remains: name the failure mode the section woul
 - **Stopping at Phase 1.** Phase 2 + Phase 3 are what catch real failure modes.
 - **Running Phase 3 on R0.** Bureaucracy on hotfixes kills adoption. Tier-down.
 - **Asking for a file path when one is named inline or implicit.** The reference is usually obvious.
-- **Treating "we'll write tests" as design-tests coverage.** Bug-catalog-first or it doesn't count.
+- **Demanding a later-stage artifact at plan time.** check-drift runs before design-tests/build/prove-it, so a `.bug-catalog.md` (or any later-stage output) cannot exist yet; failing a plan for a "missing" one blocks every otherwise-converged plan. Verify the plan's per-file COMMITMENT to produce it, not the file. Still reject a bare "we'll write tests" with no per-file bug-catalog commitment.
 - **Accepting operator-confirmation outcomes without challenging them.** §2.4 is the gate.
 - **Auto-firing /fan-out.** §2.6 proposes; the operator confirms.
 - **Treating the code-health baseline as optional when a tool is configured.** §2.5 is a gate; capture before B0.

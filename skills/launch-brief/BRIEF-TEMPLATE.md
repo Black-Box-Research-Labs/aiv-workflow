@@ -73,7 +73,7 @@ The start-PR ritual creates the worktree at `{{WORKTREE_PATH}}` (from `branch.wo
 {{#if PRE_DESIGN_APPROVAL}}
 - **Coverage matrix / design operator-approved BEFORE code volume** - design doc / table posted to PR body; operator-comment confirms before {{CODE_VOLUME_THRESHOLD}}
 {{/if}}
-- **Atomic-commit policy honored; verification packet passes `aiv check`; no authorship attribution on commits; no `--no-verify`{{#if ADMITS_AMEND_AS_BYPASS}}/`--amend`{{/if}} outside an authorized exception**
+- **Atomic-commit policy honored; verification packet passes `aiv check`; {{#if AI_DRIVEN_TRACK}}agent authorship expected (no "no AI author" gate){{else}}no authorship attribution on commits{{/if}}; no `--no-verify`{{#if ADMITS_AMEND_AS_BYPASS}}/`--amend`{{/if}} outside an authorized exception**
 - **Lint exit 0** {{LINT_BASELINE_NOTE}}
 - **Typecheck exit 0** {{TSC_BASELINE_NOTE}}
 {{#each CLASS_GATES}}
@@ -163,6 +163,7 @@ Now run the start-PR ritual.
 | `{{LINT_BASELINE_NOTE}}` | "already green; maintain" if baseline is clean, else "fix to green" |
 | `{{COORD_FILE}}` | `review.coord_file` is configured |
 | `{{PROGRESS_TRACKER}}`, `{{INVENTORY_ROW_ID}}` | `review.spec_sections.progress_tracker` is configured |
+| `{{AI_DRIVEN_TRACK}}` | `launch_brief.track` is `ai-driven` (agent authors commits; the commit-hygiene gate drops the "no AI author" condition) |
 
 ### Decisions list - class defaults
 

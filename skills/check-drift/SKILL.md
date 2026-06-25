@@ -490,11 +490,18 @@ fenced block in your output. It MUST agree with the prose verdict.
   "plan_quality": "pass|partial|fail",
   "plan_graph": "pass|partial|fail",
   "hard_stops": [{"id": "Q2", "phase": "3.3", "detail": "what blocks B0"}],
-  "open_substantive_losses": 0,
+  "missing_sections": [{"section": "§12 Test strategy", "detail": "required at R2+, absent from plan", "na_ok": false}],
   "iteration": 1
 }
 ```
 
+> `missing_sections` is REQUIRED (use `[]` when none) and is the orchestrator's machine-actionable
+> channel telling the plan stage WHICH required sections to add - each entry is `{section, detail,
+> na_ok}`; set `na_ok: true` for a section that is legitimately N/A (justified, not a blocker). Do NOT
+> emit `open_substantive_losses` or any other name - the gate validates against this exact schema and
+> rejects the block (outage → HALT) if `missing_sections` is absent.
+
 GATE #1 (`PLAN_CONVERGED`): `audit_depth_complete===true && structural_integrity==="pass" &&
-plan_quality!=="fail" && plan_graph!=="fail" && hard_stops.length===0`. A missing/invalid block is an
-outage → the orchestrator HALTs (outage ≠ pass).
+plan_quality!=="fail" && plan_graph!=="fail" && hard_stops.length===0 && every missing_sections entry has
+na_ok===true (no unresolved missing section)`. A missing/invalid block is an outage → the orchestrator
+HALTs (outage ≠ pass).

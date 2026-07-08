@@ -48,15 +48,16 @@ the supervisor resumes from the atomic cursor once the daily free limit resets. 
 isn't worth it (and reintroduces the 402 credit wall we left deepseek to escape).
 
 ```
-opus (gate):   gpt-oss-120b:free → nemotron-3-super-120b:free → north-mini-code:free
-sonnet (exec): gpt-oss-20b:free  → nemotron-3-nano-30b:free   → gpt-oss-120b:free
-haiku (cheap): nemotron-3-nano-30b:free → gpt-oss-20b:free
+opus (gate):   nemotron-3-ultra → nemotron-3-super → north-mini-code → gpt-oss-120b → gpt-oss-20b → local
+sonnet (exec): (same strongest-free-first shape, its own ranking)
+haiku (cheap): a shorter free chain, same shape
 ```
 
-Down-chain entries also add context-length headroom (super = 1M ctx) for the big aiv-audit/cr-review
-prompts. Want paid insurance for a single time-critical drive? Opt in **explicitly** per-run:
-`FIX_MODEL_CASCADE="openai/gpt-oss-120b:free,openai/gpt-oss-120b"`. Ranking rationale + the cost proof
-($8.10/2-PRs on deepseek vs $0 free) are in **`EVAL_2026-06-24.md`**.
+Each OpenRouter `:free` entry is followed by its **NVIDIA NIM mirror** (identical model, independent quota
+pool), and every tier ends in a **local Ollama model** so the cascade never hard-stalls. The exact per-tier
+lists are the `CASCADE` constant in `claude-or-shim.mjs` — that is the source of truth. Want paid insurance
+for a single time-critical drive? Opt in **explicitly** per-run:
+`FIX_MODEL_CASCADE="openai/gpt-oss-120b:free,openai/gpt-oss-120b"`. The free cascade is $0.
 
 ## Usage
 

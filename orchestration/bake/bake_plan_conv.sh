@@ -8,7 +8,7 @@ CAS="nim:nvidia/nemotron-3-ultra-550b-a55b,nvidia/nemotron-3-ultra-550b-a55b:fre
 git -C $WT reset --hard origin/master -q; git -C $WT clean -fdx -e .venv 2>/dev/null
 mkdir -p $WT/.aiv/launch-briefs/primordial-f017-walk
 cp $SC/canon/pr-primordial-f017-walk*.md $WT/.aiv/launch-briefs/primordial-f017-walk/
-rm -rf $SC/bake_work_planlfm_plan $SC/bake_work_planlfm_check-drift
+rm -rf "$SC/bake_work_planlfm_plan" "$SC/bake_work_planlfm_check-drift"
 for IT in 1 2 3; do
   echo "=== CONV ITER $IT: plan(lfm, scaffolded) ==="
   timeout 2000 bash $SC/bakeoff.sh plan local:lfm-fixpipe planlfm $WT 1

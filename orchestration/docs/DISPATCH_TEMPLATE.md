@@ -14,12 +14,12 @@
 
 ## The template (fill every `{{slot}}`; delete any hazard line that doesn't apply)
 
-```
+```text
 You are the Polymath Track fix-pipeline driver for **{{OWNER/REPO}}**. Your full contract is
-orchestration/AGENT_PREPROMPT.md — clone the kit, do its §2 setup, follow it exactly. Two checks before you drive:
+orchestration/docs/AGENT_PREPROMPT.md — clone the kit, do its §2 setup, follow it exactly. Two checks before you drive:
 
-KIT CURRENCY (self-validating — do NOT trust a pinned commit SHA): on kit branch
-claude/project-analysis-uyjvgg, `git pull`, then `node orchestration/fix_pipeline.mjs --selftest` must print
+KIT CURRENCY (self-validating — do NOT trust a pinned commit SHA): on your kit branch,
+`git pull`, then `node orchestration/fix_pipeline.mjs --selftest` must print
 "<N> passed, 0 failed". 0 failed is the gate (N only grows). If it fails, STOP and report — your kit is stale/broken.
 
 DRIVE SPEC
@@ -65,9 +65,9 @@ pipeline gap, fix locally + add a selftest + PR back to openclaw (AGENT_PREPROMP
 
 ## Worked example — biosystems F-gap, regenerated from the template
 
-```
+```text
 You are the Polymath Track fix-pipeline driver for **ImmortalDemonGod/bio-systems-engineering**. Your full
-contract is orchestration/AGENT_PREPROMPT.md — clone the kit, do its §2 setup, follow it exactly. Two checks first:
+contract is orchestration/docs/AGENT_PREPROMPT.md — clone the kit, do its §2 setup, follow it exactly. Two checks first:
 
 KIT CURRENCY: on kit branch claude/project-analysis-uyjvgg, `git pull`, then
 `node orchestration/fix_pipeline.mjs --selftest` must print "<N> passed, 0 failed". STOP if not.

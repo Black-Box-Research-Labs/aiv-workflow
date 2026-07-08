@@ -1,9 +1,8 @@
 # Dispatch playbook — pre-flight BEFORE picking a finding and authoring an agent prompt
 
 > **⚠ CURRENT STATE (2026-07-06, the 1B/ceremony campaign — READ FIRST):** this document predates ~35
-> structural fixes (#140–#174). Before acting, read `orchestration/TRACE_LOOP.md` (the operating method +
-> goal template + bake harness), `references/2026-07-06_model_intelligence_1b_campaign.md` (model roles +
-> the 7 laws of 1-2B drivers + fleet config), and `references/2026-07-06_bakeoff_matrix.md` (the evidence).
+> structural fixes (#140–#174). Before acting, read `docs/design/TRACE_LOOP.md` (the operating method +
+> goal template + bake harness).
 > Key operational deltas: `FIX_HARNESS_CEREMONY` (build|all|unset — supervisor defaults to `build`);
 > `drive_supervisor.sh` now sets the per-turn tracer + handles exit 4 (deterministic fail) and 5 (REFUTED =
 > success, never re-drive); `--seam-check` CLI verifies any parked PR's RED-at-base/GREEN-at-HEAD seam.

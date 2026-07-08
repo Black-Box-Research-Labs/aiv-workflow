@@ -69,6 +69,7 @@ Source prose: or-review comment header (`Verdict`, `Contract X/N`, `Round`, `hea
   "verdict": "PASS|WARN|FAIL",
   "contract_total": 0,
   "contract_verified": 0,
+  "contract_na": 0,
   "falsified_load_bearing": 0,
   "unverified": 0,
   "stop_condition_tripped": "none|no-verify|attribution|unexplained-patch",
@@ -78,7 +79,7 @@ Source prose: or-review comment header (`Verdict`, `Contract X/N`, `Round`, `hea
 }
 ```
 **Contributes to the Stage-12 terminator** (`IMPL_CONVERGED_THIS_ROUND`):
-`contract_verified === contract_total && verdict === "PASS" && unverified === 0 && falsified_load_bearing === 0 && stop_condition_tripped === "none" && coderabbit_actionable === 0 && {A..F} ⊆ aiv_classes_present && aiv_classes_vacuous.length === 0`.
+`(contract_verified + contract_na) === contract_total && verdict === "PASS" && unverified === 0 && falsified_load_bearing === 0 && stop_condition_tripped === "none" && coderabbit_actionable === 0 && {A..F} ⊆ aiv_classes_present`. (An N/A contract item counts toward `contract_total` via `contract_na`. `gateOrReview` does NOT check `aiv_classes_vacuous` — vacuity is aiv-audit's authoritative domain, per `#29`; the field is still emitted for aiv-audit to consume.)
 Terminate only when this holds for **N=2 consecutive rounds at the same `head_ref_oid`** (any push
 resets the streak). Round cap 6; `stop_condition_tripped !== "none"` ⇒ immediate HALT.
 

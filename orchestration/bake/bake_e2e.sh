@@ -17,7 +17,11 @@ run() { # stage model label tt
   timeout 2000 bash $SC/bakeoff.sh "$1" "$2" "$3" "$WT" "$4"
   local rc=$?
   echo "E2E-STAGE-RC $1 $rc"
-  [ $rc -ne 0 ] && echo "E2E-HALTED-AT $1" && "$OL" stop qcoder-fixpipe lfm-fixpipe 2>/dev/null && exit $rc
+  if [ "$rc" -ne 0 ]; then
+    echo "E2E-HALTED-AT $1"
+    "$OL" stop qcoder-fixpipe lfm-fixpipe 2>/dev/null
+    exit "$rc"
+  fi
 }
 run verify-finding local:qcoder-fixpipe e2e 1
 run design-tests   local:qcoder-fixpipe e2e 1

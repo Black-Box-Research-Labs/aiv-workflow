@@ -17,6 +17,12 @@ Both are derived from the operator's scope intent. The brief tells the agent *wh
 > - `launch_brief.out_dir` (default `.aiv/launch-briefs/`) - where the two files are written.
 > - `launch_brief.pr_classes` (default set below) - the project's PR-class vocabulary; a project may
 >   extend it to add classes whose slot bundles live in `CONTRACT-TEMPLATE.md`.
+> - `launch_brief.track` (default `human`) - the authorship track. `human` = a person authors the
+>   commits, so the no-attribution floor slot forbids tool/agent attribution. `ai-driven` = an agent
+>   authors the commits autonomously and the human's only acts are **H1** (finding the work) and **H2**
+>   (judging + merging); on this track the no-attribution slot drops its "no AI author" pass-condition
+>   (agent authorship is the expected state) and the branch name is treated as non-load-bearing (the
+>   harness owns it). Either track still merges through the human (`merge.autonomous` MUST be `false`).
 > - `branch.pattern` (default `feat/{stage}-pr-{slug}-{brief}`) - branch the implementing agent will create.
 > - `branch.base` (default `origin/main`).
 > - `branch.worktree_pattern` - the worktree location the start-PR ritual creates; referenced in the brief's Worktree+branch section.
@@ -148,7 +154,8 @@ Fill `CONTRACT-TEMPLATE.md`. The contract is GENERATED FROM the brief: every "Ga
 - Optional `OUT-OF-SCOPE REMINDERS:` block if `cluster-issues` is set
 
 VERIFY-slot composition rules:
-- Floor slots are emitted in fixed order at the END (typecheck+local-CI -> packet-validates -> no-attribution -> progress-tracker closure -> review-quiet-window -> issue-closed)
+- Floor slots are emitted in fixed order at the END (typecheck+local-CI -> packet-validates -> no-attribution/no-bypass -> progress-tracker closure -> review-quiet-window -> issue-closed)
+- The no-attribution slot is **track-aware** (`launch_brief.track`). On a `human` track it asserts both NO-ATTRIBUTION (no `Co-Authored-By` / tool author) and NO-BYPASS (no `--no-verify`/`--amend`). On an `ai-driven` track it asserts **NO-BYPASS only** and is titled accordingly - it carries no "no AI author" pass-condition, because agent authorship is the expected state and such a condition would red-flag every autonomous PR by construction. Its `git log` range anchors on `branch.base` (the merge-base), never a branch-name literal.
 - Class-bound slots are emitted FIRST (PR-specific evidence carries more weight than the hygiene floor)
 - Investigation slot is `[1]` when `investigation-first` is set
 - Anti-regression slot pairs with the relevant patch-landed slot
@@ -166,7 +173,7 @@ Before writing files, check:
 5. **Out-of-scope follow-up pins** - every "Out-of-scope" bullet points to another PR ID, a known stage, or an issue # (`-> #N`). Bare deferrals are rejected (deferrals are pinned work).
 6. **PRE-MERGE gate-graph** - for ui-render or observability class, PRE-MERGE must split AskUserQuestion from visual-sign-off (two parallel gates, not one).
 7. **POST-MERGE 4-section coverage** - bookkeeping / unblock / triggers / retro-verify; missing sections must be marked N/A explicitly, not omitted.
-8. **Branch name shape** - the value of `branch.pattern` (substituted) appears identically in the brief Worktree+branch section and the contract NO-ATTRIBUTION slot.
+8. **Branch range, not branch name** - the no-attribution/no-bypass slot's `git log` range anchors on `branch.base` (the merge-base), not a hardcoded branch literal. The branch name is **non-load-bearing** - the harness owns the branch - so do NOT require the substituted `branch.pattern` to appear identically in the brief and contract. (The old exact-match check made this slot a guaranteed false deviation on every autonomous PR whose branch the harness named.)
 9. **Floor calls the substrate via the tool** - the packet-validates slot calls `aiv.check_cmd`, not a restated spec rule. The progress-tracker / coord-file slots reference only configured `review.*` paths, or are dropped with a note when unconfigured.
 
 If any lint check fails, surface the issue to the operator via text BEFORE writing files. Do NOT silently fix; the operator may want to change the input instead.
@@ -193,7 +200,7 @@ Surface the final file paths + a 5-line summary of what was emitted: PR ID, clas
 - **Don't omit the lint pass.** It is the structural integrity check that separates a real brief from a template fill-in.
 - **Don't write the start-PR invocation inside the brief.** The brief ends with `Now run the start-PR ritual.` - the agent invokes it themselves.
 - **Don't restate AIV spec rules as skill knowledge.** The contract's packet slot calls `aiv check` and reads its output; it does not transcribe header strings or class-by-tier tables.
-- **Don't add tool/agent authorship attribution to commits.**
+- **Authorship attribution is track-dependent - don't hardcode the human default.** On a `human` track, don't add tool/agent authorship attribution to commits. On an `ai-driven` track, agent authorship is *expected* - do NOT forbid AI commit authors. The human's only acts are H1 (finding the work) and H2 (judging + merging); everything between is the agent's, and the commit authorship should say so.
 - **Don't use emojis** in the brief/contract unless the operator requested them. The investigation sigil and the clean/check/conflict verdict glyphs are the only sanctioned structural markers, not decoration.
 
 ## Reading order before composing

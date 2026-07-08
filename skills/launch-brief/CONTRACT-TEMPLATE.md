@@ -67,15 +67,25 @@ Banner uses U+2550 `=` (the box-drawing double-horizontal) x 5 on each side. Clo
 
 `{{AIV_CHECK_CMD}}` is `aiv.check_cmd` (default `aiv check`); `{{PACKETS_DIR}}` is `aiv.packets_dir` (default `.github/aiv-packets`). The contract relies on the tool's verdict, not on a restated spec rule.
 
-### F3 - NO ATTRIBUTION / NO BYPASS
+### F3 - NO ATTRIBUTION / NO BYPASS (track-aware)
+
+Emit per `launch_brief.track`. On a `human` track the slot asserts both no tool/agent attribution and no bypass flags:
 
 ```
 [N] NO ATTRIBUTION / NO BYPASS{{#if CLUSTER}} (outside authorized exception scope){{/if}}
-  cmd: git log {{BRANCH}}... --pretty=format:'%B' | grep -cE 'Co-Authored-By|--no-verify|--amend'
+  cmd: git log {{BASE}}..HEAD --pretty=format:'%B' | grep -cE -- 'Co-Authored-By|--no-verify|--amend'
   pass: 0 matches
 ```
 
-`{{BRANCH}}` is the `branch.pattern`-derived branch (must match the brief Worktree+branch section identically per lint rule 8).
+On an `ai-driven` track agent authorship is the expected state, so the slot **drops the attribution check** and asserts NO BYPASS only:
+
+```
+[N] NO BYPASS{{#if CLUSTER}} (outside authorized exception scope){{/if}}
+  cmd: git log {{BASE}}..HEAD --pretty=format:'%B' | grep -cE -- '--no-verify|--amend'
+  pass: 0 matches
+```
+
+`{{BASE}}` is `branch.base` (default `origin/main`). The range anchors on the merge-base, **not** a branch-name literal: the harness owns the branch name, so it is non-load-bearing (see lint rule 8). Never emit a "no AI author" pass-condition on the `ai-driven` track - it would fail every autonomous PR by construction.
 
 ### F4 - PROGRESS-TRACKER CLOSURE + COORD FILE
 
@@ -108,6 +118,53 @@ Read the review *body*, not just its status - a green status is not zero finding
 ```
 
 ---
+
+## Authoring rule — the fix VERIFY item must grade the OUTCOME, not a locked fix-approach (XOR-safe)
+
+The contract is authored HERE, at launch-brief, but the fix APPROACH is chosen later (at design-tests/write-code).
+So a finding-specific VERIFY item must NOT pre-commit to one branch of a fix that has more than one valid approach
+("change the sampler to emit the runner's keys" **OR** "change the runner to read the sampler's keys"). If you emit
+BOTH branches as separate binary-required items, the branch NOT taken is falsifiable-by-construction and the review
+oscillates forever (observed: F004 locked approach A as items [2]/[3]; write-code took approach B; or-review
+correctly falsified the road-not-taken items and the drive could never converge).
+
+Rules for the load-bearing fix item(s):
+
+1. **Emit ONE load-bearing OUTCOME item that runs the finding's `goal_condition`** — approach-agnostic, satisfied by
+   ANY valid fix. Make its `pass:` MACHINE-EVALUABLE (`exit 0`, `0 matches`, `>=N matches`, `exactly N`), never prose:
+
+   ```
+   [N] DEFECT RESOLVED (goal_condition) — approach-agnostic
+     cmd: {{GOAL_CONDITION_REPRO_CMD}}   # the finding's own "when is it fixed" repro, run at HEAD
+     pass: exit 0
+   ```
+
+2. **Fix-MECHANISM greps** (which file has which key/pattern) are legitimate for surfacing adjacent sites, but when
+   the approach is an XOR they are NOT binary-required — emit them tagged `advisory:` so a road-not-taken branch does
+   not falsify the PR. A single chosen-approach "LANDED" check (`grep ... / pass: >=1 match`, like the `ui-render`
+   class) is fine; TWO mutually-exclusive branch checks as `pass:` items are the bug.
+
+3. Keep every finding-specific `pass:` machine-evaluable so the harness can deterministically re-grade the contract
+   (fix_pipeline `#191`): the harness reclassifies a failing mechanism grep as advisory when the seam proves the
+   outcome, but ONLY if the whole contract is machine-evaluable — a prose `pass:` disables that safety net.
+
+4. **Track-awareness (D-5) — never assert a human act as a live `pass:` on the `ai-driven` track.** The human's only
+   acts are H1 (the finding) and H2 (judge + merge); there is NO live operator-approval event mid-drive. So an item
+   like `pass: … operator approval BEFORE first impl commit` is unsatisfiable autonomously and blocks convergence
+   forever (same class as the already-forbidden "no AI commit author" pass-condition). On the `ai-driven` track,
+   assert only the machine-verifiable part (e.g. "an investigation section is present in the PR body/plan":
+   `grep -c` / `pass: >=1`); record any genuine human judgment-call as an H2-adjudicable note (`contract_na`), never
+   as a live gate.
+
+5. **Finding-source-awareness (D-6) — do not emit a human-GitHub-workflow gate that cannot apply to THIS finding.**
+   When the finding is a **synthetic / audit-derived** finding (its `intentSource` is an audit doc, not a GitHub
+   issue number), `Closes #<id>` can never appear in the PR body — `#F004` is not an issue — so the **ISSUE-CLOSED**
+   floor slot (F6) must be `contract_na` (H2 bookkeeping), not a live gate; emit it as a note, or drop it. Likewise
+   the **REVIEW-QUIET-WINDOW / CONVERGENCE** slot (F5) is the TERMINATOR's job (STABLE_N rounds at the same head),
+   not a model-graded contract item — it is circular at review time and (being prose) also disables the harness's
+   deterministic contract re-grade (`#191`). On an autonomous synthetic-finding drive, drop F5 as a VERIFY item or
+   mark it `contract_na`. Rule of thumb: every RETAINED VERIFY item must be machine-evaluable AND satisfiable by the
+   autonomous flow; anything keyed to a human GitHub action goes to `contract_na`.
 
 ## PR-Classes (class-bound slots, emitted before floor)
 
@@ -532,9 +589,9 @@ POST-MERGE:
 5. **Out-of-scope follow-up pins** - every brief `## Out-of-scope` bullet has `-> {{REF}}` to another PR ID, stage, or issue #. Bare deferrals fail lint.
 6. **PRE-MERGE gate-graph** - class in {ui-render, observability} => PRE-MERGE has the split-gate pattern. Flag `cluster-issues` set OR class `test-debt` with >=30 commits => the AskUserQuestion condition-list mentions "post-categorization + per-category strategy approved" or equivalent.
 7. **POST-MERGE 4-section coverage** - bookkeeping AND unblock AND triggers AND retro-verify present. Sections marked N/A pass lint; omitted sections fail.
-8. **Branch name shape** - the substituted `branch.pattern` value appears IDENTICALLY in the brief Worktree+branch section and the contract F3 (NO-ATTRIBUTION) slot.
+8. **Branch range, not branch name** - the F3 slot's `git log` range anchors on `branch.base` (the merge-base), not a hardcoded branch literal. The branch name is non-load-bearing (the harness owns it), so do NOT require the substituted `branch.pattern` to appear identically in the brief and contract.
 9. **Substrate via the tool** - the F2 packet slot calls `aiv.check_cmd` (no restated spec rule). F4 references only configured `review.*` paths; if neither `review.spec_sections.progress_tracker` nor `review.coord_file` is set, F4 is dropped with a note (not a hard fail).
-10. **Floor slot order** - TYPECHECK -> PACKET-VALIDATES -> NO-ATTRIBUTION -> PROGRESS-TRACKER (if present) -> REVIEW-QUIET-WINDOW -> ISSUE-CLOSED appear in that order at the END of VERIFY.
+10. **Floor slot order** - TYPECHECK -> PACKET-VALIDATES -> NO-ATTRIBUTION/NO-BYPASS (track-aware title per `launch_brief.track`) -> PROGRESS-TRACKER (if present) -> REVIEW-QUIET-WINDOW -> ISSUE-CLOSED appear in that order at the END of VERIFY.
 11. **Slot numbering monotone** - `[1]`, `[2]`, ... contiguous. No gaps.
 12. **Banner glyph integrity** - exactly 5x `=` (box-drawing double-horizontal) each side of the banner title, opening and closing.
 13. **Brief Gate-to-Contract slot pairing** - every brief Gate of the form "X against Y" or "X ran" has a contract VERIFY slot ENFORCING X ran (not merely citing Y). A Gate that references an artifact without a slot that enforces the artifact exists fails lint.

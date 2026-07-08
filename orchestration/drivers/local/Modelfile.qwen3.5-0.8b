@@ -1,0 +1,15 @@
+# SOTA ~1B model for the fix-pipeline local lane (2026-07).
+# Qwen3.5-0.8B (Alibaba, Mar 2026): newest ~1B, native function-calling, agentic-tuned (tops BFCL-V4 in-series).
+# NO hosted provider serves the small Qwen3.5 weights — run locally via Ollama (needs >=0.31).
+#
+#   ollama pull qwen3.5:0.8b
+#   ollama create qwen3.5-fixpipe -f drivers/local/Modelfile.qwen3.5-0.8b
+#   FIX_MODEL_CASCADE=local:qwen3.5-fixpipe   (shim #128 local lane -> localhost:11434/v1; no OPENROUTER_API_KEY needed)
+#
+# num_ctx: Ollama's default runtime window (~4k) starves the big fix-pipeline prompt -> finish=length before the
+#   model can think+act (trained ctx is 262k). 16k gives ample room on 8GB RAM for a 0.8B.
+# temperature/top_p: modestly lowered from the 1.0/0.95 default for steadier tool-calling in a deterministic pipeline.
+FROM qwen3.5:0.8b
+PARAMETER num_ctx 16384
+PARAMETER temperature 0.4
+PARAMETER top_p 0.9

@@ -1,0 +1,4 @@
+fix/
+.DS_Store
+*.log
+drivers/openrouter/.selftest_*.txt

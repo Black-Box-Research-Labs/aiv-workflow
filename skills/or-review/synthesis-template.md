@@ -151,8 +151,13 @@ To compute `N` reliably:
 grep -cE '^\[[0-9]+\]' <contract-file>
 ```
 
-`X` = count of items marked ✓ (verified) in your Stage 7 output table. `?`, `✗`, and `N/A` are NOT
-counted toward `X`.
+`X` = count of items marked ✓ (verified) in your Stage 7 output table. `?` and `✗` are NOT counted
+toward `X` (they are `unverified` / `falsified` respectively). Items that are legitimately **`N/A`** —
+not applicable to THIS PR (e.g. no progress-tracker configured / a slot that self-drops) OR resolvable
+only by the human at H2 (e.g. creating the tracking issue when `gh` is unavailable) — are counted in
+**`contract_na`**, NOT in `X`. An N/A item is RESOLVED (verified-as-not-our-job), not unverified, so it
+MUST NOT block convergence: the terminator credits `contract_verified + contract_na` against
+`contract_total`. Invariant: `contract_verified + contract_na + unverified + falsified === contract_total`.
 
 The contract table you emit MUST reflect the same set: include EVERY item present in the source (even
 gaps in numbering), and OMIT slots that are absent. If you encounter a slot gap, note it once at the
@@ -203,6 +208,7 @@ orchestrator reads the verdict as JSON (never the prose). It MUST agree with the
   "verdict": "PASS|WARN|FAIL",
   "contract_total": 0,
   "contract_verified": 0,
+  "contract_na": 0,
   "falsified_load_bearing": 0,
   "unverified": 0,
   "stop_condition_tripped": "none|no-verify|attribution|unexplained-patch",
@@ -212,7 +218,7 @@ orchestrator reads the verdict as JSON (never the prose). It MUST agree with the
 }
 ```
 
-Terminator (Stage 12): `contract_verified===contract_total && verdict==="PASS" && unverified===0 &&
+Terminator (Stage 12): `(contract_verified + contract_na)===contract_total && verdict==="PASS" && unverified===0 &&
 falsified_load_bearing===0 && stop_condition_tripped==="none" && coderabbit_actionable===0 &&
 {A..F}⊆aiv_classes_present && aiv_classes_vacuous.length===0`, stable for N=2 rounds at the same
 `head_ref_oid` (any push resets the streak).

@@ -111,7 +111,8 @@ Stage-exit criteria (all three):
 
 - orchestration/bake/bakeoff.sh — single-stage runner: stage, cascade, label, worktree, text_tools; sets
   FIX_WORK/FIX_SHIM_TRACE/FIX_MODEL_CASCADE per label; propagates the pipeline's real exit code.
-- orchestration/bake/bake_e2e.sh — the 5-stage chained walk (vf->dt->tq->wc->pi), clean-state + final audit.
+- orchestration/bake/bake_stage.sh — per-stage bake runner (dt|wc|pi single stages, plan-conv loop, e2e
+  5-stage chained walk vf->dt->tq->wc->pi); resets the worktree to each stage's precondition + injects canon.
 - orchestration/bake/canon/ — F017 ground-truth preconditions (nemotron's brief/contract/plan) for regression bakes.
 - orchestration/bake/specs/spec_f017_template.json — spec template (edit cwd per worktree).
 - Production drives: drive_supervisor.sh (ceremony=build default, tracer on, exit 3/2/4 stop, 5 = refuted success).

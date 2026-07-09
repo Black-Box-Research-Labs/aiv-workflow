@@ -4547,8 +4547,15 @@ async function runLiveStage(stageKey, finding, cwd, spec, opts = {}) {
       // the model's semantic judgment (pass|fail + one-line violations). Unparseable = softFail retry.
       if (s.gate === "test_quality_verdict" && tqPre) {
         const respText = `${raw}\n${String(env.result || r.O || "")}`;
+        // #163.1: a weak model often emits {"verdict":"fail"} ESCAPED inside a tool-call narration
+        // (\"verdict\":\"fail\"), so the strict regex misses it and the stage spuriously HALTs (observed live:
+        // qcoder-1b test-quality — the verdict WAS present, escaped, and the stage HALTed on "no parseable block").
+        // De-escape and re-run the SAME precise verdict-key regex as a last resort (NOT a bare pass/fail word,
+        // which is ambiguous in prose — this only matches an actual "verdict":"pass|fail" structure).
+        const deesc = respText.replace(/\\+"/g, '"');
         const word = (verdict && /^(pass|fail)$/i.test(String(verdict.verdict)) && String(verdict.verdict).toLowerCase())
-          || (respText.match(/"verdict"\s*:\s*"(pass|fail)"/i) || [])[1]?.toLowerCase() || null;
+          || (respText.match(/"verdict"\s*:\s*"(pass|fail)"/i) || [])[1]?.toLowerCase()
+          || (deesc.match(/"verdict"\s*:\s*"(pass|fail)"/i) || [])[1]?.toLowerCase() || null;
         if (word === null) { verdict = null; softFail = 'answer with {"verdict":"pass"|"fail","violations":[...]} — do NOT emit the 7-field verdict (the harness synthesizes it from its pre-verified facts)'; }
         else {
           const viols = ((verdict && Array.isArray(verdict.violations) && verdict.violations) || []).slice(0, 8)

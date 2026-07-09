@@ -64,6 +64,8 @@ provenance), and `drivers/openrouter/probes/` to vet a candidate model before a 
 ## Where to read next
 
 - `../docs/PIPELINE.md` — the 14-stage blueprint the harness implements.
+- `../docs/MAINTAINER_GUIDE.md` — the deep maintainer's guide to `src/fix_pipeline.mjs` (spine, gates, ceremony, sharp edges).
+- `../docs/AIV_PRIMER.md` — a self-contained intro to the AIV protocol (evidence classes, tiers, the `aiv` lifecycle).
 - `../docs/TRACE_LOOP.md` — the operating method (VERIFY-BEFORE-CLAIM + the goal template).
 - `../docs/TRAINDATA_CORPUS.md` — how a drive's full trajectory is captured as training data.
 - `../docs/DRAFTING-DRIVES.md` — how to draft non-bug-fix (feature / consistency / refactor) drives.

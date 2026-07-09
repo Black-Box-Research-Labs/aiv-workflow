@@ -73,7 +73,7 @@ Emit per `launch_brief.track`. On a `human` track the slot asserts both no tool/
 
 ```
 [N] NO ATTRIBUTION / NO BYPASS{{#if CLUSTER}} (outside authorized exception scope){{/if}}
-  cmd: git log {{BASE}}..HEAD --pretty=format:'%B' | grep -cE 'Co-Authored-By|--no-verify|--amend'
+  cmd: git log {{BASE}}..HEAD --pretty=format:'%B' | grep -cE -- 'Co-Authored-By|--no-verify|--amend'
   pass: 0 matches
 ```
 
@@ -81,7 +81,7 @@ On an `ai-driven` track agent authorship is the expected state, so the slot **dr
 
 ```
 [N] NO BYPASS{{#if CLUSTER}} (outside authorized exception scope){{/if}}
-  cmd: git log {{BASE}}..HEAD --pretty=format:'%B' | grep -cE '--no-verify|--amend'
+  cmd: git log {{BASE}}..HEAD --pretty=format:'%B' | grep -cE -- '--no-verify|--amend'
   pass: 0 matches
 ```
 
@@ -118,6 +118,53 @@ Read the review *body*, not just its status - a green status is not zero finding
 ```
 
 ---
+
+## Authoring rule — the fix VERIFY item must grade the OUTCOME, not a locked fix-approach (XOR-safe)
+
+The contract is authored HERE, at launch-brief, but the fix APPROACH is chosen later (at design-tests/write-code).
+So a finding-specific VERIFY item must NOT pre-commit to one branch of a fix that has more than one valid approach
+("change the sampler to emit the runner's keys" **OR** "change the runner to read the sampler's keys"). If you emit
+BOTH branches as separate binary-required items, the branch NOT taken is falsifiable-by-construction and the review
+oscillates forever (observed: F004 locked approach A as items [2]/[3]; write-code took approach B; or-review
+correctly falsified the road-not-taken items and the drive could never converge).
+
+Rules for the load-bearing fix item(s):
+
+1. **Emit ONE load-bearing OUTCOME item that runs the finding's `goal_condition`** — approach-agnostic, satisfied by
+   ANY valid fix. Make its `pass:` MACHINE-EVALUABLE (`exit 0`, `0 matches`, `>=N matches`, `exactly N`), never prose:
+
+   ```
+   [N] DEFECT RESOLVED (goal_condition) — approach-agnostic
+     cmd: {{GOAL_CONDITION_REPRO_CMD}}   # the finding's own "when is it fixed" repro, run at HEAD
+     pass: exit 0
+   ```
+
+2. **Fix-MECHANISM greps** (which file has which key/pattern) are legitimate for surfacing adjacent sites, but when
+   the approach is an XOR they are NOT binary-required — emit them tagged `advisory:` so a road-not-taken branch does
+   not falsify the PR. A single chosen-approach "LANDED" check (`grep ... / pass: >=1 match`, like the `ui-render`
+   class) is fine; TWO mutually-exclusive branch checks as `pass:` items are the bug.
+
+3. Keep every finding-specific `pass:` machine-evaluable so the harness can deterministically re-grade the contract
+   (fix_pipeline `#191`): the harness reclassifies a failing mechanism grep as advisory when the seam proves the
+   outcome, but ONLY if the whole contract is machine-evaluable — a prose `pass:` disables that safety net.
+
+4. **Track-awareness (D-5) — never assert a human act as a live `pass:` on the `ai-driven` track.** The human's only
+   acts are H1 (the finding) and H2 (judge + merge); there is NO live operator-approval event mid-drive. So an item
+   like `pass: … operator approval BEFORE first impl commit` is unsatisfiable autonomously and blocks convergence
+   forever (same class as the already-forbidden "no AI commit author" pass-condition). On the `ai-driven` track,
+   assert only the machine-verifiable part (e.g. "an investigation section is present in the PR body/plan":
+   `grep -c` / `pass: >=1`); record any genuine human judgment-call as an H2-adjudicable note (`contract_na`), never
+   as a live gate.
+
+5. **Finding-source-awareness (D-6) — do not emit a human-GitHub-workflow gate that cannot apply to THIS finding.**
+   When the finding is a **synthetic / audit-derived** finding (its `intentSource` is an audit doc, not a GitHub
+   issue number), `Closes #<id>` can never appear in the PR body — `#F004` is not an issue — so the **ISSUE-CLOSED**
+   floor slot (F6) must be `contract_na` (H2 bookkeeping), not a live gate; emit it as a note, or drop it. Likewise
+   the **REVIEW-QUIET-WINDOW / CONVERGENCE** slot (F5) is the TERMINATOR's job (STABLE_N rounds at the same head),
+   not a model-graded contract item — it is circular at review time and (being prose) also disables the harness's
+   deterministic contract re-grade (`#191`). On an autonomous synthetic-finding drive, drop F5 as a VERIFY item or
+   mark it `contract_na`. Rule of thumb: every RETAINED VERIFY item must be machine-evaluable AND satisfiable by the
+   autonomous flow; anything keyed to a human GitHub action goes to `contract_na`.
 
 ## PR-Classes (class-bound slots, emitted before floor)
 

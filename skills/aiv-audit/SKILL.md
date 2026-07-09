@@ -11,6 +11,10 @@ A shape gate confirms the packet exists and is structurally valid. Passing it do
 
 > **Config.** Read `.aiv-workflow.yml` at the repo root (`git rev-parse --show-toplevel`; override via `$AIV_WORKFLOW_CONFIG`). Keys used: `aiv.cli` (default `aiv`), `aiv.spec_path` (default `aiv-protocol/SPECIFICATION.md`), `aiv.packets_dir` (default `.github/aiv-packets`), `aiv.check_cmd` (default `aiv check`), `evidence.mandate_all_classes` (default `true`), `evidence.exclude_classes` (default `[G]`), `branch.base` (default `origin/main`). If the file is absent, use these defaults and say so.
 
+> **HEADLESS PIPELINE RUNS:** the worktree does NOT contain `aiv-protocol/SPECIFICATION.md` — the load-bearing
+> spec content is INLINED in your prompt as SPEC-DIGEST.md (a "--- SKILL ASSET ---" section). Use it as the
+> spec; do NOT search the filesystem for the spec file (it is outside the workspace and reads will be blocked).
+
 > **Read the spec, don't restate it.** This skill does NOT hardcode section numbers, class-by-tier tables, or finding-ID strings. Open `aiv.spec_path` and read the actual risk-classification section, the evidence-class definitions, and the immutability/retention requirements for *this* project's spec version. Cite the sections and finding IDs the spec actually uses. Where a section is referenced below it is named by its role ("the risk-classification section", "the Class A / Execution definition"), not a fixed number - resolve the number from the spec at audit time.
 
 ## When to invoke

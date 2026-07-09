@@ -1,0 +1,45 @@
+#!/bin/bash
+# `claude` drop-in wrapper — routes the fix-pipeline's `claude -p` subagent spawns to the
+# OpenRouter agentic shim instead of the Anthropic CLI. Put THIS dir on PATH (ahead of the real
+# `claude`) and the pipeline runs unmodified on a non-Claude driver. See ../README.md.
+#
+# Two things this wrapper does that the bare shim can't:
+#   1. NODE_USE_ENV_PROXY=1 — node's global fetch ignores HTTPS_PROXY unless this is set, so without
+#      it every OpenRouter call 403s ("Host not in allowlist") behind the agent proxy.
+#   2. GIT_AUTHOR_*/GIT_COMMITTER_* — the sandbox's global git identity is "Claude". Override it so
+#      commits the driver makes are attributed to the ACTUAL model (honest AIV Class-F provenance).
+#      Edit these to match whatever model MODEL_MAP in claude-or-shim.mjs routes to.
+set -euo pipefail
+
+# resolve this script's real dir (follow symlinks) so the shim path is portable, not hard-coded
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do
+  DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+BIN_DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
+SHIM="$BIN_DIR/../claude-or-shim.mjs"
+
+# Default to a model-neutral author because the shim now runs a multi-model CASCADE (gpt-oss free ->
+# paid -> nemotron); set FIX_DRIVER_GIT_NAME to the cascade primary for a more precise attribution.
+export GIT_AUTHOR_NAME="${FIX_DRIVER_GIT_NAME:-openrouter-driver (fix-pipeline)}"
+export GIT_AUTHOR_EMAIL="${FIX_DRIVER_GIT_EMAIL:-noreply@openrouter.ai}"
+export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
+export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
+
+# #89: the detached supervisor bakes HTTPS_PROXY at launch, but a worker/session restart ROTATES the
+# agent-proxy port (e.g. 36099 -> 45311), leaving every long-lived drive with a dead port -> every
+# OpenRouter fetch fails with "fetch failed" and the stage cycles with no progress. This wrapper re-runs
+# on EVERY shim spawn (one `claude -p` per stage attempt), so re-resolve the LIVE port here from
+# /root/.ccr/README.md (regenerated each restart with the current port) and OVERRIDE the stale inherited
+# value. undici reads HTTPS_PROXY at node startup, so this must happen before exec.
+if [ -f /root/.ccr/README.md ]; then
+  CCR_PORT="$(grep -oE '127\.0\.0\.1:[0-9]+' /root/.ccr/README.md | head -1 | cut -d: -f2)"
+  if [ -n "${CCR_PORT:-}" ]; then
+    export HTTPS_PROXY="http://127.0.0.1:$CCR_PORT"
+    export https_proxy="$HTTPS_PROXY"
+  fi
+fi
+
+exec env NODE_USE_ENV_PROXY=1 node "$SHIM" "$@"

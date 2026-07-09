@@ -1,0 +1,15 @@
+{
+ "id": "F017",
+ "repo": "ImmortalDemonGod/PrimordialEncounters",
+ "cwd": "<WORKTREE — overridden per-run by bakeoff.sh's --cwd>",
+ "baseBranch": "origin/master",
+ "changeIdPrefix": "primordial-f017-walk",
+ "planPath": ".aiv/plans/primordial-f017-walk-plan.md",
+ "intentSource": "audit/02-static-audit.md",
+ "intentLine": 24,
+ "bugSite": "`src/parameter_sampler.py:11`",
+ "findingFile": "<BAKE_ROOT>/finding_F017.txt",
+ "headBranch": "fix/bake-{L}",
+ "goalCondition": "python -m src.parameter_sampler produces ~0.1-0.25 AU/day (was ~10-25); python -c \"print(86400/1.496e8)\" ~5.78e-4",
+ "title": "F017"
+}

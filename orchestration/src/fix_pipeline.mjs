@@ -470,7 +470,7 @@ async function haltRefuted(spec, stageKey, v, via) {
   try { writeFileSync(rm, `# FINDING REFUTED at ${stageKey}${via ? ` ${via}` : ""} — ${spec.id || ""} (do NOT drive)\n\nrepro: ${v.repro_command}\nobserved: ${v.observed}\nexpected per finding: ${v.expected_per_finding}\nreasoning: ${v.reasoning || ""}\n\nQueue write-back owed: mark ${spec.id || "this finding"} refuted in the kit queue; the audit source needs the correction.\n\n_${ts()}_\n`); } catch {}
   try { const st = loadState(); const rec = (st.findings[spec.id] = st.findings[spec.id] || { spec: { id: spec.id }, stages: {} }); rec.status = "refuted"; rec.refutedAt = stageKey; rec.updated = ts(); saveState(st); } catch {}
   console.error(`[${stageKey}] FINDING REFUTED${via ? ` ${via}` : ""} — walk terminated (exit 5); record at ${rm}. The audit gets the bug report, not the repo.`);
-  recordStep(spec, { kind: "outcome", stage: stageKey, gate: "REFUTED", verdict: JSON.stringify(v).slice(0, 800) });
+  recordStep(spec, { kind: "outcome", stage: stageKey, gate: "REFUTED", verdict: JSON.stringify(v).slice(0, 8000) });   // 800 -> 8000: full label for the training corpus (see the gate-outcome record below)
   await traindataPush(spec, `${stageKey} REFUTED${via ? ` ${via}` : ""}`);
   process.exit(5);
 }
@@ -4743,7 +4743,11 @@ async function runLiveStage(stageKey, finding, cwd, spec, opts = {}) {
     }
     console.error(`[gate ${stageKey}] verdict: ${JSON.stringify(verdict)}`);
     console.error(`[gate ${stageKey}] -> ${gatePass ? "PASS (advance)" : "NOT CONVERGED (loop back / revise)"}`);
-    recordStep(spec, { kind: "outcome", stage: stageKey, seq: spawnSeq, gate: gatePass ? "PASS" : "FAIL", verdict: JSON.stringify(verdict).slice(0, 800) });
+    // Cap raised 800 -> 8000: the OUTCOME verdict is the training-corpus LABEL, and multi-claim prove_it_manifest /
+    // multi-section check_drift_verdict blocks exceed 800 (measured: prove-it and check-drift verdicts routinely hit
+    // the old cap), truncating them into invalid JSON and making those two gate stages non-reconstructable offline.
+    // 8000 captures the real blocks with a safety bound against a pathological verdict.
+    recordStep(spec, { kind: "outcome", stage: stageKey, seq: spawnSeq, gate: gatePass ? "PASS" : "FAIL", verdict: JSON.stringify(verdict).slice(0, 8000) });
     if (!gatePass && s.haltOnGateFail) haltStage(`gate ${s.gate} did not pass: ${JSON.stringify(verdict).slice(0, 400)}`);
   }
   console.error(`[live] stage '${stageKey}' done`);

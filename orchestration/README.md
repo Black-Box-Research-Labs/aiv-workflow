@@ -66,4 +66,5 @@ provenance), and `drivers/openrouter/probes/` to vet a candidate model before a 
 - `../docs/PIPELINE.md` — the 14-stage blueprint the harness implements.
 - `../docs/TRACE_LOOP.md` — the operating method (VERIFY-BEFORE-CLAIM + the goal template).
 - `../docs/TRAINDATA_CORPUS.md` — how a drive's full trajectory is captured as training data.
+- `../docs/DRAFTING-DRIVES.md` — how to draft non-bug-fix (feature / consistency / refactor) drives.
 - `bake/` — the per-stage benchmark rig: an F017 worked example (brief, plan, contract) + per-stage runners.

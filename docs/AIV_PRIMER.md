@@ -79,7 +79,7 @@ Six classes carry the evidence; a seventh (G) is optional/cognitive.
 | **C** | Negative | Absence of disallowed patterns (deleted assertions, `@pytest.mark.skip`, etc.) | R2+ |
 | **D** | Differential | Change **impact** beyond test coverage — API-surface / state / config deltas | R3 |
 | **E** | Intent | Alignment with the upstream requirement (issue / spec / directive) | R1+ |
-| **F** | Provenance | Artifact integrity + git chain-of-custody of the covering test files | R3 (opt. R2) |
+| **F** | Provenance | Artifact integrity + git chain-of-custody of the covering test files | R3 |
 | **G** | Cognitive | The SVP mental-verification phases (predict / trace / probe / ownership) | optional |
 
 Two things people get wrong:
@@ -169,11 +169,12 @@ both:
    these packets advertise Differential evidence they don't contain. This is a
    decision to make (relabel vs. document the convention), not a confirmed bug.
 
-2. **Stricter Class E.** The protocol accepts a plain issue/spec URL as Class E
-   intent; the pipeline **requires a SHA-pinned blob URL** into the original audit
-   file that produced the finding (built at intake by `materializeFinding`). This is stricter than
-   the protocol, and intentional — it makes intent immutable and traceable to the
-   exact audit line.
+2. **Stricter Class E.** The protocol requires an *immutable* intent reference — a
+   SHA-pinned spec permalink, a versioned issue ID, or a hashed snapshot (a mutable
+   issue/branch URL is rejected, `E-001`). The pipeline **narrows** this to specifically
+   a **SHA-pinned blob URL** into the original audit file that produced the finding
+   (built at intake by `materializeFinding`) — intentional, so intent is immutable and
+   traceable to the exact audit line.
 
 Everything else — the packet format, the A/B/C/E/F evidence semantics, the tier
 system, the `aiv begin → commit → close` lifecycle, the `E0xx` error codes — the
@@ -207,7 +208,7 @@ the rest is enforcement detail.
     "C": "Negative — absence of disallowed patterns (R2+)",
     "D": "Differential — change impact API/state/config (R3)",
     "E": "Intent — upstream requirement alignment (R1+)",
-    "F": "Provenance — chain-of-custody (R3, opt R2)",
+    "F": "Provenance — chain-of-custody (R3)",
     "G": "Cognitive — SVP phases (optional)"
   },
   "risk_tiers": { "R0": "Trivial/self", "R1": "Low/self", "R2": "Medium/independent-SoD", "R3": "High/independent-SoD+full-A-F" },

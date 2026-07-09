@@ -129,20 +129,22 @@ specification**, that's flagged rather than invented here.
   code-quality, not one of those categories. The mislabel survives because `aiv check`
   validates section *structure*, not class *semantics*. See §12 AIV-DIV-01.
 - **Class E / canonical intent** — the evidence that a change addresses its *stated*
-  reason. This pipeline requires Class E to be a **SHA-pinned URL** into the original
-  audit file that produced the finding (built at intake) — stricter than the
-  protocol minimum, which also accepts a plain issue/spec URL. "SHA-pinned" = the
-  link names an exact commit hash, so it can't silently drift to different code.
+  reason. The protocol requires an **immutable** intent reference — a SHA-pinned spec
+  permalink, a versioned issue ID, or a hashed snapshot; a mutable issue/branch URL is
+  rejected (`E-001`). This pipeline **narrows** that to specifically a **SHA-pinned URL**
+  into the original audit file that produced the finding (built at intake). "SHA-pinned"
+  = the link names an exact commit hash, so it can't silently drift to different code.
 - **The aiv lifecycle** — the CLI ceremony a code-writing stage performs:
   `aiv begin <id>` opens a change context (relaxing the "1 file + 1 packet" atomic
   rule); `aiv commit <file> -m <msg> -c <claim> -i <intent-url> --requirement <req>
   -r <rationale> -s <summary> [-t <tier>]` commits one file while the tool *runs
   real checks* to collect the evidence (pytest coverage → Class A, `git diff` →
   Class B, anti-cheat scan → Class C, provenance → Class F), which is why it takes
-  minutes; `aiv close` builds the Layer-2 packet from those commits; `aiv check` and
-  `aiv audit` validate a packet's *structure* and immutability (not its semantics —
-  the aiv-audit **stage** in §6 is what judges *content* correspondence, a check the
-  CLIs can't do). When a weak model fumbles this ceremony, the harness performs it (§8).
+  minutes; `aiv close` builds the Layer-2 packet from those commits; `aiv check`
+  validates a packet's *structure* (an 8-stage pipeline), and `aiv audit` its *content
+  quality* (TODO remnants, missing SHAs, unverified-claim rates). Deeper semantic
+  claim↔evidence *correspondence* is the fix-pipeline's own aiv-audit **stage** (§6),
+  not the CLI. When a weak model fumbles this ceremony, the harness performs it (§8).
 - **Risk tier (R0–R3)** — how much scrutiny a change needs, and who may verify it:
   **R0** Trivial (docs/formatting; self-verify; checks skippable), **R1** Low
   (isolated bug fixes; self-verify), **R2** Medium (API/config/deps; requires an
@@ -557,8 +559,8 @@ Every gate flows through the same pipeline: **extract → coerce → validate �
 
 | Schema | Gate predicate | Passes when |
 |--------|---------------|-------------|
-| `check_drift_verdict` | `gatePlanConverged` | audit-depth complete, no hard-stops, no unresolved missing sections |
-| `or_review_verdict` | `gateOrReview` | all contract items verified/N-A, PASS, 0 unverified/falsified, 0 actionable, all classes present |
+| `check_drift_verdict` | `gatePlanConverged` | audit-depth complete, `plan_quality` & `plan_graph` not `"fail"`, no hard-stops, no unresolved missing sections |
+| `or_review_verdict` | `gateOrReview` | all contract items verified/N-A, PASS, 0 unverified/falsified, stop-condition `none`, 0 actionable, all classes present |
 | `aiv_audit_result` | `gateAivAudit` | not NON-COMPLIANT, 0 blocking findings |
 | `test_quality_verdict` | `gateTestQuality` | four booleans true + 0 blocking |
 | `prove_it_manifest` | `gateProveIt` | `unverified_count==0`, ≥1 claim PASS, and every claim resolved — PASS **or** a rationalized N/A (`claimResolved`) |

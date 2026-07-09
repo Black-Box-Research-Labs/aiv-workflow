@@ -11,7 +11,7 @@ export FIX_MODEL_CASCADE="$MODEL"
 [ "$TT" = "1" ] && export FIX_TEXT_TOOLS=1
 export FIX_SHIM_TRACE=$SC/trace_bake_${LABEL}_${STAGE}.jsonl
 [ "$KEEP_WORK" != "1" ] && rm -rf "$FIX_WORK" 2>/dev/null; mkdir -p "$FIX_WORK"
-timeout 2000 node fix_pipeline.mjs --run-stage "$STAGE" --spec "$SC/bake_specs/spec_${LABEL}.json" --cwd "$WT" > "$SC/bake_${LABEL}_${STAGE}.log" 2>&1
+timeout 2000 node src/fix_pipeline.mjs --run-stage "$STAGE" --spec "$SC/bake_specs/spec_${LABEL}.json" --cwd "$WT" > "$SC/bake_${LABEL}_${STAGE}.log" 2>&1
 RC=$?
 echo "EXIT=$RC [$LABEL/$STAGE]"
 exit $RC

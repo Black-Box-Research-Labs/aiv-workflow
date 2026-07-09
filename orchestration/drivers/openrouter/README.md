@@ -1,6 +1,6 @@
 # Driver swap — running the fix pipeline on a non-Claude model
 
-> Proof-of-concept: the deterministic fix pipeline (`orchestration/fix_pipeline.mjs`) is **model-agnostic**.
+> Proof-of-concept: the deterministic fix pipeline (`orchestration/src/fix_pipeline.mjs`) is **model-agnostic**.
 > Every stage is spawned as `claude -p ...` and gated on a **schema-valid machine block** — never on the
 > model's prose or identity. So you can swap the driver behind the `claude` command and the pipeline runs
 > unmodified. This directory routes that command to **OpenRouter** (validated end-to-end on `deepseek-v4-pro`).
@@ -67,9 +67,9 @@ export PATH="$PWD/orchestration/drivers/openrouter/bin:$PATH"   # shadow the rea
 which claude                                   # -> .../drivers/openrouter/bin/claude
 
 # from here, the pipeline is driven entirely by the OpenRouter model:
-node orchestration/fix_pipeline.mjs --preflight        # cheap real call — proves auth + tool-use + handoff
-node orchestration/fix_pipeline.mjs --intake --finding-id <ID> --repo <O/R> ...
-SPEC=...; bash orchestration/drive_supervisor.sh "$SPEC" /tmp/drive.log
+node orchestration/src/fix_pipeline.mjs --preflight        # cheap real call — proves auth + tool-use + handoff
+node orchestration/src/fix_pipeline.mjs --intake --finding-id <ID> --repo <O/R> ...
+SPEC=...; bash orchestration/src/drive_supervisor.sh "$SPEC" /tmp/drive.log
 ```
 
 To target a different OpenRouter model, edit `MODEL_MAP` in `claude-or-shim.mjs` and the

@@ -1,29 +1,25 @@
 #!/usr/bin/env node
 /**
- * fix_pipeline.mjs — the Polymath Track fix orchestrator (prereqs #2 + #3).
+ * fix_pipeline.mjs — the Polymath Track fix orchestrator.
  *
- * The fix-side sibling of skills/forensic-audit-pipeline/forensic_pipeline.mjs. A DETERMINISTIC
- * harness — not an LLM — that drives one audit finding through aiv-workflow's 14 stages, gating
- * every transition on a schema-valid artifact and HALTing fail-closed when a gate fails. Each stage
- * is a fresh isolated `claude -p` subagent (SoD by construction). Two human touchpoints (H1 in, H2
- * judge+merge out) are the only manual transitions. Design: ../POLYMATH_TRACK.md §5A; gate contract:
- * ./MACHINE_BLOCK_SCHEMAS.md; inherited learnings: ./LEARNINGS_CARRYFORWARD.md.
+ * A DETERMINISTIC harness — not an LLM — that drives one audit finding through aiv-workflow's 14
+ * stages, gating every transition on a schema-valid artifact and HALTing fail-closed when a gate
+ * fails. Each stage is a fresh isolated `claude -p` subagent (SoD by construction). Two human
+ * touchpoints (H1 in, H2 judge+merge out) are the only manual transitions. The gate-contract schemas
+ * are the SCHEMAS registry below; the operating method is docs/TRACE_LOOP.md.
  *
- * Robustness is INHERITED from forensic_pipeline.mjs (11+ audits): tolerant JSON parse + machine-block
- * extraction [RNA], enum-drift coercion [cultivation], recursive enum-checked validation
- * [cultivation/RNA], durable state + checkpoint/resume + HALT-REPORT [RNA/pytest], outage≠pass HALTs
- * [pytest/RNA], cost-tracked-never-gated principle [mastery], Halt-exit-code semantics. The LIVE
- * per-stage runner (`runLiveStage` → spawn `claude -p`) is WIRED AND RUNNING (prereq #1 landed
- * 2026-06-20; skills VENDORED into ./skills so one clone is self-contained). Real full-spine drives
- * have parked PRs at H2: flashcore F8 #50, RNA_PREDICT s2c3l0-020 #87, F354 #51 (see ./RNA_RUN_LOG.md
- * + ./RUN_OBSERVATIONS.md). The DEFERRED carries in ./LEARNINGS_CARRYFORWARD.md are all implemented
- * now (spawn-error handler, stale-file delete, error-feedback retry, E2BIG spill, usage-limit backoff).
+ * Robustness is INHERITED from a sibling forensic-audit pipeline (11+ prior audits): tolerant JSON
+ * parse + machine-block extraction, enum-drift coercion, recursive enum-checked validation, durable
+ * state + checkpoint/resume + HALT-REPORT, outage≠pass HALTs, the cost-tracked-never-gated principle,
+ * and Halt-exit-code semantics. The LIVE per-stage runner (`runLiveStage` → spawn `claude -p`) is
+ * wired and running; skills are resolved from the repo-root skills/ (see SKILLS_DIR). Real full-spine
+ * drives have parked PRs at H2 across the target repos (captured in the training corpus).
  * The zero-API paths remain as CI-grade harness checks.
  *
- *   node fix_pipeline.mjs --drive --spec <f.json> [--cwd <wt>]   # THE SPINE: drive a finding H1->H2 (resumable)
- *   node fix_pipeline.mjs --selftest   # zero-API: gates, validator, coercion, extraction, state
- *   node fix_pipeline.mjs --dry-run    # zero-API: full 14-stage flow + both loops + state + HALT
- *   node fix_pipeline.mjs --seam-check --spec <f.json> --cwd <wt>  # #157.1 deterministic RED-at-base/GREEN-at-HEAD check (exit 0 holds / 4 fails)
+ *   node src/fix_pipeline.mjs --drive --spec <f.json> [--cwd <wt>]   # THE SPINE: drive a finding H1->H2 (resumable)
+ *   node src/fix_pipeline.mjs --selftest   # zero-API: gates, validator, coercion, extraction, state
+ *   node src/fix_pipeline.mjs --dry-run    # zero-API: full 14-stage flow + both loops + state + HALT
+ *   node src/fix_pipeline.mjs --seam-check --spec <f.json> --cwd <wt>  # #157.1 deterministic RED-at-base/GREEN-at-HEAD check (exit 0 holds / 4 fails)
  *
  * FIX_HARNESS_CEREMONY — the harness-owns-mechanics mode (#143-#169; measured 2026-07-06):
  *   unset    = full agentic tasks (rich traces; corpus-generation walks; the pre-campaign behavior)
@@ -357,7 +353,7 @@ function synthesizeOrReviewVerdict(word, headRefOid, round, grade) {
   };
 }
 
-// ───────────────────────── machine-block schemas (JSON-schema form; ./MACHINE_BLOCK_SCHEMAS.md) ─────────────────────────
+// ───────────────────────── machine-block schemas (JSON-schema form; the gate contract the skills' verdict blocks satisfy) ─────────────────────────
 const E = (...v) => ({ type: "string", enum: v });
 const hardStop = { type: "object", required: ["id"], properties: { id: { type: "string" }, phase: { type: "string" }, detail: { type: "string" } } };
 const SCHEMAS = {
@@ -540,13 +536,13 @@ const MODEL_CODE = process.env.FIX_MODEL_CODE || MODEL_EXEC;  // #95 (free-model
 // defaults to MODEL_EXEC (real-claude-valid); set FIX_MODEL_CODE=code so the OpenRouter shim routes write-code to
 // the dedicated CODE cascade (Laguna M.1 → Nemotron-Ultra → gpt-oss-120b) — the gpt-oss authoring models produce
 // broken code at write-code (gutted files, prose-in-.py), so the impl stage gets the strongest free coders instead.
-// SKILLS ARE THE SINGLE SOURCE OF TRUTH at the aiv-workflow repo root (../skills relative to this driver in
-// orchestration/). The load-bearing harness patches (check-drift missing_sections, or-review contract_na,
+// SKILLS ARE THE SINGLE SOURCE OF TRUTH at the aiv-workflow repo root (../../skills relative to this driver in
+// orchestration/src/). The load-bearing harness patches (check-drift missing_sections, or-review contract_na,
 // launch-brief track-awareness, aiv-audit SPEC-DIGEST, the test-quality gate) live there now; there is no
 // second vendored copy to drift. Resolution order: explicit override, then a co-located ./skills (kept so a
-// self-contained single-dir vendor still works), then the repo-root ../skills, then the legacy fallback path.
+// self-contained single-dir vendor still works), then the repo-root ../../skills, then the legacy fallback path.
 const SKILLS_DIR = process.env.AIV_WORKFLOW_SKILLS
-  || [join(import.meta.dirname, "skills"), join(import.meta.dirname, "..", "skills")]
+  || [join(import.meta.dirname, "skills"), join(import.meta.dirname, "..", "skills"), join(import.meta.dirname, "..", "..", "skills")]
        .find((d) => existsSync(join(d, "check-drift", "SKILL.md")))
   || "/home/user/.review/aiv-workflow/skills";
 const INVARIANTS = [
@@ -2951,7 +2947,7 @@ function novelUnpinnedTools(headPy, basePy) {
   return unpinnedLintTools(headPy).filter((e) => { const name = LINT_TOOLS.find((t) => e.toLowerCase().startsWith(t.toLowerCase())) || e; return !baseUnpinned.has(name); });
 }
 
-// ── #40: training-data corpus — capture FULL trajectories to distill cheaper drivers (DESIGN_TRAINDATA_CORPUS.md) ──
+// ── #40: training-data corpus — capture FULL trajectories to distill cheaper drivers (docs/TRAINDATA_CORPUS.md) ──
 // OFF by default: a pure no-op unless FIX_TRAINDATA_DIR points at a clone of a dedicated training-data
 // repo you control. NON-FATAL by construction — instrumentation must NEVER break a real fix (a lost training step != a lost
 // fix), so every failure here logs + continues. Captures every spawnOnce (every goal-loop attempt INCLUDING the
@@ -3340,7 +3336,7 @@ async function synthesizePacket(cwd, spec, finding, stageKey) {
 }
 
 // ───────────── #106: deterministic localization + skeleton context (research Findings 3 & 5) ─────────────
-// The deep-research workflow (orchestration/research/weak-model-coding-techniques.md) surfaced two inference-time
+// A deep-research review of weak-model coding techniques surfaced two inference-time
 // levers for weak coders that were NOT yet wired into the harness:
 //   Finding 3 — hierarchical localization-then-edit (Agentless): localize file→symbol→edit-site BEFORE editing.
 //               Weak models fumble the SEARCH; handing them the exact targets lifts end-to-end edit success.

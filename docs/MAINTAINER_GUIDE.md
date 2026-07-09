@@ -6,7 +6,7 @@ can verify it against source rather than trust this document. References are by
 function/symbol name, not line number; to locate one, grep the name in
 `orchestration/src/fix_pipeline.mjs` — the names are stable.
 
-> **Read this in one sitting.** The program is one file, 166 functions, no exports,
+> **Read this in one sitting.** The program is one file, ~200 functions, no exports,
 > no module boundaries. The structure lives in section-banner comments
 > (`─────── name ───────`) and in ~130 numbered-learning comments (`#NN`). This
 > guide is the map that file does not contain.

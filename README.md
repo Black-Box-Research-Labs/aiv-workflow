@@ -39,6 +39,19 @@ original finding through to the merge judgment.
 
 ## Install
 
+First install the **`aiv` CLI** (Layer 1). It is **not published to PyPI** — install it from source out
+of the [aiv-protocol](https://github.com/Black-Box-Research-Labs/aiv-protocol) repo (Python ≥3.10):
+
+```bash
+git clone https://github.com/Black-Box-Research-Labs/aiv-protocol.git
+pip install -e ./aiv-protocol        # editable install; puts `aiv` on PATH
+#   for multi-language evidence collection, add the extra:
+#   pip install -e "./aiv-protocol[polyglot]"
+aiv --help                           # verify: init / check / begin / commit / close / svp
+```
+
+Then add this plugin:
+
 ```
 /plugin marketplace add github:Black-Box-Research-Labs/aiv-workflow
 /plugin install aiv-workflow@black-box-research-labs
@@ -56,7 +69,7 @@ when a key (or the whole file) is absent.
 
 ## Requirements
 
-- The [`aiv` CLI](https://github.com/Black-Box-Research-Labs/aiv-protocol) on PATH (Layer 1).
+- The [`aiv` CLI](https://github.com/Black-Box-Research-Labs/aiv-protocol) on PATH (Layer 1) — see **Install** above (it is not on PyPI; install from source).
 - `gh` (GitHub CLI) for review/CI skills.
 - Project-specific tooling per your config (e.g. a test runner, Playwright) for `prove-it` / `poll-ci`.
 

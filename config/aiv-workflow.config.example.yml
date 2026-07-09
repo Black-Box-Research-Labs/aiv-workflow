@@ -18,7 +18,7 @@ project:
 # aiv-protocol keeps its OWN config at `.aiv.yml` (created by `aiv init`), distinct from THIS file.
 # `aiv init` also creates .github/aiv-packets/ (Layer 2 packets) + .github/aiv-evidence/ (Layer 1).
 aiv:
-  cli: aiv                                    # aiv-protocol CLI on PATH (pip install aiv-protocol)
+  cli: aiv                                    # aiv-protocol CLI on PATH (install from the aiv-protocol repo, not PyPI — see README)
   spec_path: aiv-protocol/SPECIFICATION.md    # canonical spec (submodule or vendored copy)
   packets_dir: .github/aiv-packets            # Layer 2 verification packets
   evidence_dir: .github/aiv-packets/evidence  # prove-it behavioral artifacts (distinct from .github/aiv-evidence/)

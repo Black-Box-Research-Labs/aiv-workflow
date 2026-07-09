@@ -65,7 +65,5 @@ provenance), and `drivers/openrouter/probes/` to vet a candidate model before a 
 
 ## Where to read next
 
-- `docs/OPERATOR.md` — set up and operate a drive (prereqs, dispatch, proof-strength triage).
-- `docs/MACHINE_BLOCK_SCHEMAS.md` — the gate-contract schemas the orchestrator validates.
 - `docs/design/TRACE_LOOP.md` — the operating method (VERIFY-BEFORE-CLAIM + the goal template).
 - `bake/` — the per-stage benchmark rig: an F017 worked example (brief, plan, contract) + per-stage runners.

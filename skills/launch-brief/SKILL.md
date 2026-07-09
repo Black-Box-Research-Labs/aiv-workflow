@@ -1,6 +1,6 @@
 ---
 name: launch-brief
-description: Compose a paired launch brief + completion contract for a new PR. Produces a briefing document for the implementing agent and a binary green/red completion contract that proves the work is done. Classifies the PR up-front by change shape (migration / ui-render / dispatcher / refactor / schema-additive / infrastructure / test-debt / observability / docs, extensible per project) and binds class-specific verification slots beyond the hygiene floor. Lints the output for investigation-slot consistency, class-to-required-slot coverage, brief-gate-to-contract-verify parity, and pre-merge gate-graph completeness. Use when the user says "launch brief", "new PR brief", "completion contract", "draft brief for PR-X", or "spin up brief for issue #N". Does NOT start the PR or open it; the output is documents the operator dispatches.
+description: Compose a paired launch brief + completion contract for a new PR. Produces a briefing document for the implementing agent and a binary green/red completion contract that proves the work is done. Classifies the PR up-front by change shape (migration / ui-render / dispatcher / refactor / schema-additive / infrastructure / test-debt / observability / docs / feature-absent, extensible per project) and binds class-specific verification slots beyond the hygiene floor. Lints the output for investigation-slot consistency, class-to-required-slot coverage, brief-gate-to-contract-verify parity, and pre-merge gate-graph completeness. Use when the user says "launch brief", "new PR brief", "completion contract", "draft brief for PR-X", or "spin up brief for issue #N". Does NOT start the PR or open it; the output is documents the operator dispatches.
 ---
 
 # Launch brief - paired brief + completion contract
@@ -44,7 +44,9 @@ Both are derived from the operator's scope intent. The brief tells the agent *wh
 
 When `launch_brief.pr_classes` is unset, use this project-agnostic set. Each class has a slot bundle in `CONTRACT-TEMPLATE.md`:
 
-`migration` / `ui-render` / `dispatcher` / `refactor` / `schema-additive` / `infrastructure` / `test-debt` / `observability` / `docs`.
+`migration` / `ui-render` / `dispatcher` / `refactor` / `schema-additive` / `infrastructure` / `test-debt` / `observability` / `docs` / `feature-absent`.
+
+`feature-absent` is the class for a finding where **required behavior is missing** and the change implements it so an **external, unmodifiable oracle** (a shipped conformance test / reference fixtures — the answer key the agent must not author or weaken) goes RED → GREEN. Its slot bundle grades the outcome (the `goalCondition`), asserts the oracle is byte-identical base→HEAD, and flags (advisory) delegating to a library/builtin instead of implementing the behavior.
 
 A project can extend this list via `launch_brief.pr_classes` and supply matching slot bundles. If the operator names a class not in the active vocabulary, surface it and ask whether to add a bundle or pick an existing class.
 
@@ -120,6 +122,7 @@ Every brief has a "You decide" section listing the choices the implementing agen
 - infrastructure -> CI-runner choice; secret distribution
 - test-debt -> fix-batch boundary (per file / per category / per root cause); brittle-pin policy
 - docs -> source-of-truth boundary; which sections are normative
+- feature-absent -> implementation approach (the external oracle grades the OUTCOME, so choose freely); which module holds the new behavior; whether to add supplementary tests for edge cases the oracle does not exercise
 
 `path-fork` means at least one decision-point becomes a Path A vs Path B fork with a *path-conditional VERIFY item* in the contract (see `CONTRACT-TEMPLATE.md` Slot operations).
 

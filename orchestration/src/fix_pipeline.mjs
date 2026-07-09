@@ -444,7 +444,18 @@ const gateTestQuality = (v) =>
 // and HALTed only because the gate hard-required `verdict`). Accept the synonyms — `…:"FAIL"` still fails, so
 // this normalizes the NAME, never the decision (same spirit as coerceEnums; the brittle-gate fix from #33/#34).
 const claimVerdict = (c) => c && (c.verdict || c.result || c.status || c.outcome);
-const gateProveIt = (m) => m.unverified_count === 0 && m.claims.length > 0 && m.claims.every((c) => claimVerdict(c) === "PASS");
+// N/A-claim fix (surfaced by a feature-drive stress test): a rationalized N/A claim is RESOLVED, not a
+// failure — same spirit as gateOrReview's contract_na and the all-class honest-N/A. A bare
+// claims.every(===PASS) HALTed prove-it even with unverified_count===0 and every substantive claim PASSing,
+// because one legitimate N/A (e.g. a Class-E live-fire N/A on a pure-logic change) is not "PASS". Still
+// fail-closed: UNVERIFIED/FAIL block (unverified_count===0 double-guards), a vacuous N/A (no rationale) is
+// rejected, and >=1 PASS is required so an agent cannot N/A its way past the behavioral gate.
+const claimResolved = (c) => {
+  const v = claimVerdict(c);
+  return v === "PASS" || ((v === "N/A" || v === "NA") && typeof (c && c.rationale) === "string" && c.rationale.trim().length > 0);
+};
+const gateProveIt = (m) => m.unverified_count === 0 && m.claims.length > 0
+  && m.claims.some((c) => claimVerdict(c) === "PASS") && m.claims.every(claimResolved);
 // #45: require at least one required check — `[].every()` is true, so an empty/absent check set was a
 // fail-OPEN seam (a green gate with zero evidence). Production uses ciVerdict (guards runs.length>0); this
 // hardens the fixture/legacy gate to the same "outage != pass" discipline.
@@ -5250,6 +5261,9 @@ async function selftest() {
   t("prove-it accepts `status:PASS` synonym", gateProveIt({ unverified_count: 0, claims: [{ status: "PASS" }] }));
   t("prove-it still BLOCKS a real FAIL regardless of field name", !gateProveIt({ unverified_count: 0, claims: [{ result: "PASS" }, { result: "FAIL" }] }));
   t("prove-it still BLOCKS a claim with no verdict-ish field at all", !gateProveIt({ unverified_count: 0, claims: [{ description: "no outcome field" }] }));
+  t("prove-it accepts a rationalized N/A claim alongside PASS (feature-drive Class-E live-fire N/A)", gateProveIt({ unverified_count: 0, claims: [{ verdict: "PASS" }, { verdict: "N/A", rationale: "pure-logic change, no infra boundary" }] }));
+  t("prove-it BLOCKS a vacuous N/A with no rationale (fill-the-box anti-pattern)", !gateProveIt({ unverified_count: 0, claims: [{ verdict: "PASS" }, { verdict: "N/A" }] }));
+  t("prove-it BLOCKS an all-N/A manifest with zero PASS (cannot N/A past the behavioral gate)", !gateProveIt({ unverified_count: 0, claims: [{ verdict: "N/A", rationale: "x" }, { verdict: "N/A", rationale: "y" }] }));
   t("CI gate blocks a required failure", !gateCI({ checks: [{ required: true, conclusion: "failure" }] }));
 
   // INHERITED robustness — validator (enum value), coercion, tolerant parse, extraction

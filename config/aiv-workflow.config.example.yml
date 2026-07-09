@@ -111,4 +111,4 @@ audit:
 launch_brief:
   out_dir: .aiv/launch-briefs    # brief + completion contract written here (match review.contracts_dir)
   # Default project-agnostic class set; extend per project.
-  pr_classes: [migration, ui-render, dispatcher, refactor, schema-additive, infrastructure, e2e-harness, test-debt, observability, docs]
+  pr_classes: [migration, ui-render, dispatcher, refactor, schema-additive, infrastructure, e2e-harness, test-debt, observability, docs, feature-absent]

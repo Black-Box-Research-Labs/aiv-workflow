@@ -380,6 +380,29 @@ Pairs with the multi-environment-probe slot operation if the project has more th
 
 `{{NOTIFY_CHANNEL}}` and `{{TRIGGER_PATTERN}}`/`{{HARNESS_CONFIG}}` come from the project's facts/config. The SECRET-NEVER-COMMITTED check substitutes `{{SECRET_TOKEN_NAME}}` with each secret the harness consumes (run once per secret).
 
+### feature-absent
+
+Required behavior is absent; the change implements it so an external, unmodifiable oracle goes RED -> GREEN. The oracle (a shipped conformance test + its reference fixtures/snapshots) is the answer key the agent must NOT author or weaken.
+
+```
+[N] BEHAVIOR PRESENT (goal_condition) - approach-agnostic
+  cmd: {{GOAL_CONDITION_CMD}}
+  pass: exit 0 (the external oracle that was RED at the cited baseline is now GREEN)
+
+[N] ORACLE UNMODIFIED (the answer key was not weakened)
+  cmd: git diff {{BASE}}..HEAD -- {{ORACLE_PATHS}}
+  pass: empty diff - the external test + reference fixtures/snapshots are byte-identical base..HEAD
+
+[N] REAL IMPLEMENTATION, NOT DELEGATION - advisory (fix-mechanism grep, not binary-required)
+  cmd: grep -nE "{{DELEGATION_PATTERN}}" {{IMPL_PATHS}}
+  advisory: 0 matches - the change implements the behavior rather than delegating to a library/builtin that
+    trivially satisfies the oracle. Advisory, not a hard gate: the oracle often compares against that very
+    builtin and cannot distinguish a real implementation from a delegating one, so this is anti-theater
+    signal for H2, not a binary pass/fail (see the XOR-safe authoring rule above).
+```
+
+`{{GOAL_CONDITION_CMD}}` is the finding's machine-checkable oracle (its `goalCondition`). `{{ORACLE_PATHS}}` are the external test + fixture/snapshot paths that constitute the answer key (a non-empty diff here is a stop-condition). `{{DELEGATION_PATTERN}}` is the library/builtin the real implementation must not simply forward to (e.g. `torch\.nn\.functional\.softmax`).
+
 ---
 
 ## Flags (flag-bound slots)

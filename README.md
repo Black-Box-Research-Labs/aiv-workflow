@@ -42,7 +42,10 @@ original finding through to the merge judgment.
 The skills can be driven by hand, or unattended: [`orchestration/`](orchestration/README.md) ships a
 deterministic harness (`src/fix_pipeline.mjs`) that drives every stage from finding to
 awaiting-merge, gating each transition on a schema-valid machine verdict and halting fail-closed.
-[`docs/MAINTAINER_GUIDE.md`](docs/MAINTAINER_GUIDE.md) is its operating manual.
+[`docs/MAINTAINER_GUIDE.md`](docs/MAINTAINER_GUIDE.md) is its operating manual. The harness is
+**model-agnostic** — gates decide on schema-valid evidence, never on the model's identity — so drives
+run on Claude, on **free OpenRouter models**, or **fully local Ollama models** via a drop-in driver
+shim ([`orchestration/drivers/openrouter/`](orchestration/drivers/openrouter/README.md)).
 
 Findings don't have to come from an audit. A **feature, consistency, or refactor** task is driven by
 **drafting a finding** — "required behavior is ABSENT," anchored to a machine-checkable **external

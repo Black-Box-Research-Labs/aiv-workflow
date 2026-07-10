@@ -15,7 +15,7 @@ makes the pipeline **model-agnostic** and safe to run on cheap or free models.
 
 - `src/` — the driver (`fix_pipeline.mjs`, start here) + `drive_supervisor.sh` (detached, auto-resuming runner).
 - `../skills/` — the aiv-workflow skills the driver consumes (single source of truth).
-- `drivers/` — run the pipeline on a non-Claude model (the OpenRouter shim + model-vetting `probes/`).
+- `drivers/` — run the pipeline on a non-Claude model: the OpenRouter shim (`openrouter/`, free-model cascade + model-vetting `probes/`) and the local Ollama lane (`local/`, no key, no rate limit).
 - `bake/` — the per-stage benchmark rig (F017 worked example + fixtures).
 - `../docs/` — the pipeline blueprint (`PIPELINE.md`) + design docs (`TRACE_LOOP.md`, `TRAINDATA_CORPUS.md`).
 
@@ -60,9 +60,12 @@ outage≠pass gates, and HALT exit codes (`3`=HALT, `4`=gate-fail, `5`=finding-r
 Every stage is spawned as `claude -p ...` and gated on a schema-valid block — never on the model's prose or
 identity — so the driver is swappable behind the `claude` command with zero pipeline changes. `drivers/openrouter/`
 ships a `claude -p` drop-in shim that routes spawns to OpenRouter, validated end-to-end on a non-Claude model
-through the check-drift + aiv-audit gates and surviving a container restart. See `drivers/openrouter/README.md`
-for the swap mechanism and its two non-obvious requirements (`NODE_USE_ENV_PROXY=1`, honest `GIT_AUTHOR_*`
-provenance), and `drivers/openrouter/probes/` to vet a candidate model before a real drive.
+through the check-drift + aiv-audit gates and surviving a container restart. The cascade is free-only —
+free OpenRouter entries, their NVIDIA NIM mirrors, and a **fully local Ollama floor** (`drivers/local/`,
+no key, no rate limit). See `drivers/openrouter/README.md` for the swap mechanism, the local-lane setup,
+the shim env vars (`FIX_MODEL_CASCADE`, `FIX_TEXT_TOOLS`, `FIX_LOCAL_URL`, `NVIDIA_API_KEY`), and its two
+non-obvious requirements (`NODE_USE_ENV_PROXY=1`, honest `GIT_AUTHOR_*` provenance); use
+`drivers/openrouter/probes/` to vet a candidate model before a real drive.
 
 ## Where to read next
 

@@ -1,5 +1,11 @@
 # TRACE LOOP — the fix-pipeline observability loop (canonical, v2 post-campaign)
 
+> **Who needs this:** you do NOT need the trace loop to run drives — `drive_supervisor.sh` already
+> auto-resumes environment kills, stops on fail-closed HALTs, and watches for post-H2 review. This is
+> the **maintainer/power-user** discipline for when you are *qualifying a new or weak driver model*
+> (free/local lanes) or *diagnosing recurring HALTs* — i.e. hunting harness-contract gaps by reading
+> the model's actual recorded turns. Happy-path users can stop reading here.
+
 The operating method for grinding the pipeline against any driver (1B locals or nemotron). v1 ran the
 2026-07-06 campaign (35 fixes #140-#174); v2 bakes in every discipline clause that session's failures taught.
 Invoke as: `/loop <the LOOP PROMPT below>` (dynamic mode, 1200s ticks = the operator-set 20-minute cadence). Pair with a /goal whose

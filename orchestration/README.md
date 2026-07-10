@@ -72,7 +72,7 @@ non-obvious requirements (`NODE_USE_ENV_PROXY=1`, honest `GIT_AUTHOR_*` provenan
 - `../docs/PIPELINE.md` — the 14-stage blueprint the harness implements.
 - `../docs/MAINTAINER_GUIDE.md` — the deep maintainer's guide to `src/fix_pipeline.mjs` (spine, gates, ceremony, sharp edges).
 - `../docs/AIV_PRIMER.md` — a self-contained intro to the AIV protocol (evidence classes, tiers, the `aiv` lifecycle).
-- `../docs/TRACE_LOOP.md` — the operating method (VERIFY-BEFORE-CLAIM + the goal template).
+- `../docs/TRACE_LOOP.md` — the maintainer/power-user observability discipline (VERIFY-BEFORE-CLAIM + the goal template). Not needed to run drives — reach for it when qualifying a new/weak driver model or diagnosing recurring HALTs.
 - `../docs/TRAINDATA_CORPUS.md` — how a drive's full trajectory is captured as training data.
 - `../docs/DRAFTING-DRIVES.md` — how to draft non-bug-fix (feature / consistency / refactor) drives.
 - `bake/` — the per-stage benchmark rig: an F017 worked example (brief, plan, contract) + per-stage runners.

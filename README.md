@@ -44,6 +44,12 @@ deterministic harness (`src/fix_pipeline.mjs`) that drives every stage from find
 awaiting-merge, gating each transition on a schema-valid machine verdict and halting fail-closed.
 [`docs/MAINTAINER_GUIDE.md`](docs/MAINTAINER_GUIDE.md) is its operating manual.
 
+Findings don't have to come from an audit. A **feature, consistency, or refactor** task is driven by
+**drafting a finding** — "required behavior is ABSENT," anchored to a machine-checkable **external
+oracle** the agent cannot author or weaken — and then runs the exact same pipeline
+(`launch-brief` classifies it `feature-absent` natively). [`docs/DRAFTING-DRIVES.md`](docs/DRAFTING-DRIVES.md)
+is the runbook.
+
 ## Install
 
 First install the **`aiv` CLI** (Layer 1). It is **not published to PyPI** — install it from source out

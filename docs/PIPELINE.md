@@ -10,7 +10,10 @@ operations (packet scaffolding, evidence collection, validation, the guard).
 Two human touchpoints, no more:
 
 - **H1 - the audit.** A human produces findings, each with evidence (line numbers, a cited SHA, an
-  artifact). A finding is a unit of work with a falsifiable anchor.
+  artifact). A finding is a unit of work with a falsifiable anchor. It does not have to come from an
+  audit: feature / consistency / refactor work enters the same way, as a **drafted finding** stating
+  "required behavior is ABSENT" with a machine-checkable external oracle as the anchor — see
+  [`DRAFTING-DRIVES.md`](DRAFTING-DRIVES.md).
 - **H2 - the evidence judge.** A human judges the AIV evidence at the end and performs any
   irreducible human verification.
 

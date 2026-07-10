@@ -37,7 +37,10 @@ cursor, stopping only on a fail-closed HALT or SPINE COMPLETE.
 A drive is parameterized by a per-finding spec: `id`, `repo`, base branch, change prefix, the cited intent
 source, the bug site, and the **`goalCondition`** — the machine-checkable oracle that decides "fixed."
 `bake/specs/spec_f017_template.json` is a complete worked example; hand-author one, or generate specs from
-your own findings queue. `LIVE_STAGES` tasks carry no finding literals — everything is `{{SPEC}}`
+your own findings queue. For non-bug-fix work (a feature / consistency / refactor), draft the finding first —
+[`../docs/DRAFTING-DRIVES.md`](../docs/DRAFTING-DRIVES.md) is the runbook (the `feature-absent` shape:
+behavior absent + an external oracle as `goalCondition` + a stub at baseline as the `bugSite`).
+`LIVE_STAGES` tasks carry no finding literals — everything is `{{SPEC}}`
 placeholders resolved by `applySpec`, so the spec is the only per-finding input.
 
 ## The two convergence loops

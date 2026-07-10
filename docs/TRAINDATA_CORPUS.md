@@ -1,8 +1,10 @@
 # DESIGN — Training-data corpus (full-trajectory capture to distill cheaper drivers)
 
-> **Status:** shipped and selftested in `fix_pipeline.mjs`. Capture is **off by default** and turns on when you
-> set **`FIX_TRAINDATA_DIR`** to a clone of a repo **you** control — point it at your OWN training-data store.
-> When unset, selftest / dry-run / normal drives are completely unaffected (no behavior change).
+> **Status:** shipped and selftested in `fix_pipeline.mjs`. Capture turns on when you set
+> **`FIX_TRAINDATA_DIR`** to a clone of a repo **you** control — point it at your OWN training-data store.
+> When unset, selftest / dry-run / single-stage runs are completely unaffected (no behavior change) — but a
+> real `--drive` **fails closed** before any spawn unless the sink is a functioning writable git clone:
+> spine drives are captured by operator mandate, never silently uncaptured.
 >
 > **What ships:** `scrubText` (STRICT drop-on-secret + PII/path redaction, noreply allowlist), `recordStep`
 > (scrub then append one JSONL line per attempt, non-fatal), `traindataPush` (commit+push at each stage
@@ -120,13 +122,14 @@ blocker, but do not let trajectories carry large pasted file contents — refere
 
 ## 4. The capture seam in `fix_pipeline.mjs`
 
-A single sink abstraction, **off by default** (safe — no behavior change unless enabled), enabled per-drive:
+A single sink abstraction, enabled per-drive (and mandatory for a real `--drive` — see the Status note):
 
 - `const TRAINDATA = process.env.FIX_TRAINDATA_DIR || null;` — a path to a clone of the dedicated repo. Null ⇒
-  capture is a no-op (selftest/dry-run/un-configured drives are unaffected).
+  capture is a no-op for selftest / dry-run / single-stage runs; a full `--drive` fails closed instead of
+  running uncaptured.
 - `function recordStep(spec, rec)` — scrub (§5) then append a JSONL line to `<TRAINDATA>/drives/<id>/steps.jsonl`.
   Pure-ish (filesystem append); selftestable on the scrub + record-shape with a temp dir.
-- **Hook point: `spawnOnce` (line ~1488–1516).** It already has `prompt`, `env`, `r` (streams), and the goal
+- **Hook point: `spawnOnce`** (resolve by symbol name — line numbers drift). It already has `prompt`, `env`, `r` (streams), and the goal
   loop already has `feedback`, `n` commits, `oracleGuardLive`, the gate `out` JSON, `verifyCmd` result. So
   `spawnOnce` returns the input half; the goal-loop / gate path assembles the `outcome` half and calls
   `recordStep`. This captures EVERY attempt (not just the last), which is the negative-example data.

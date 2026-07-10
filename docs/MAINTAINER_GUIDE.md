@@ -192,9 +192,9 @@ confusing until you know the other two exist:
   evidence (the classes, tiers, packet format) and enforces it (the `aiv` CLI,
   git hooks, the guard). `AIV_PRIMER.md` (companion to this guide) summarizes it.
   The pipeline's stages *call* the `aiv` CLI; they never reimplement the spec.
-- **`aiv-workflow`** — the *agent workflow*. ~12 Claude Code skills (`launch-brief`,
+- **`aiv-workflow`** — the *agent workflow*. 13 Claude Code skills (`launch-brief`,
   `check-drift`, `design-tests`, `prove-it`, `or-review`, `aiv-audit`, `start-pr`,
-  `ground-yourself`, `poll-ci`, `rigor-audit`, `aiv-packet`, `fan-out`) plus the
+  `ground-yourself`, `poll-ci`, `rigor-audit`, `aiv-packet`, `fan-out`, `test-quality`) plus the
   pipeline blueprint (`docs/PIPELINE.md`) describing *how* an agent drives a finding
   to a merged PR. **Each stage of this pipeline runs one of those skills** —
   `fix_pipeline.mjs` reads their `SKILL.md` at runtime from the repo's canonical

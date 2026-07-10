@@ -2,7 +2,7 @@
   "name": "aiv-workflow",
   "displayName": "AIV Workflow",
   "version": "0.1.0",
-  "description": "Agent workflow layer for the AIV protocol: skills that drive a project from audit finding to merge (launch-brief, check-drift, start-pr, ground-yourself, design-tests, aiv-packet, prove-it, or-review, aiv-audit, rigor-audit, poll-ci). Calls the aiv-protocol `aiv` CLI for all substrate operations; never reimplements the spec.",
+  "description": "Agent workflow layer for the AIV protocol: skills that drive a project from audit finding to merge (launch-brief, check-drift, start-pr, ground-yourself, design-tests, aiv-packet, prove-it, or-review, aiv-audit, rigor-audit, poll-ci, fan-out, test-quality). Calls the aiv-protocol `aiv` CLI for all substrate operations; never reimplements the spec.",
   "author": {
     "name": "Black Box Research Labs"
   },

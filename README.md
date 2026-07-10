@@ -16,8 +16,8 @@ aiv-protocol   ── the PROTOCOL + TOOL ──  what evidence is valid (spec, 
       │ skills CALL the `aiv` CLI; they never reimplement the spec
       │
 aiv-workflow   ── the AGENT WORKFLOW ──   HOW an agent drives finding -> plan -> build ->
-(Layer 2, here)                            review -> merge. 11 skills + the pipeline design +
-                                           a per-project config.
+(Layer 2, here)                            review -> merge. 13 skills + the pipeline design +
+                                           an orchestration harness + a per-project config.
 ```
 
 `aiv-protocol` knows *what counts as evidence and enforces it*. `aiv-workflow` knows *how an agent
@@ -25,17 +25,24 @@ produces and audits that evidence across a PR's life*. This repo is Layer 2.
 
 ## What's in the box
 
-Eleven skills, grouped by pipeline phase (full design in [`docs/PIPELINE.md`](docs/PIPELINE.md)):
+Thirteen skills — eleven pipeline-stage skills grouped by phase, plus two cross-cutting ones (full
+design in [`docs/PIPELINE.md`](docs/PIPELINE.md)):
 
 | Phase | Skills |
 |---|---|
 | **Plan** | `launch-brief` (finding -> brief + completion contract), `check-drift` (independent convergence gate on the plan) |
 | **Build** | `start-pr` (pre-flight ritual), `ground-yourself` (write down the understanding), `design-tests` (bug-catalog-first tests), `aiv-packet` (verification packet per commit), `prove-it` (behavioral evidence: render-and-look, end-to-end, cited-baseline) |
 | **Review** | `or-review` (multi-angle independent review), `aiv-audit` (packet content vs spec + evidence harvest), `rigor-audit` (any-PR verification rigor), `poll-ci` (watch CI, carry signals back) |
+| **Cross-cutting** | `fan-out` (the shared multi-angle investigation + claim-verification protocol the plan/review skills reuse), `test-quality` (adversarial fail-closed audit of `design-tests` output; wired as a gate stage by the orchestration harness) |
 
 The two hard invariants the design enforces: **context isolation** at the build->review boundary
 (the reviewer never hears the implementer's reasoning), and an **evidence chain** preserved from the
 original finding through to the merge judgment.
+
+The skills can be driven by hand, or unattended: [`orchestration/`](orchestration/README.md) ships a
+deterministic harness (`src/fix_pipeline.mjs`) that drives every stage from finding to
+awaiting-merge, gating each transition on a schema-valid machine verdict and halting fail-closed.
+[`docs/MAINTAINER_GUIDE.md`](docs/MAINTAINER_GUIDE.md) is its operating manual.
 
 ## Install
 
@@ -75,5 +82,7 @@ when a key (or the whole file) is absent.
 
 ## Status
 
-`v0.1.0` scaffold. See [`docs/PIPELINE.md`](docs/PIPELINE.md) for the design and
-[`docs/CONVENTIONS.md`](docs/CONVENTIONS.md) for how skills are kept project-agnostic.
+`v0.1.0`. The plugin ships the 13 skills plus the [`orchestration/`](orchestration/) harness that
+drives them unattended. See [`docs/PIPELINE.md`](docs/PIPELINE.md) for the design,
+[`docs/CONVENTIONS.md`](docs/CONVENTIONS.md) for how skills are kept project-agnostic, and
+[`docs/MAINTAINER_GUIDE.md`](docs/MAINTAINER_GUIDE.md) for the harness.

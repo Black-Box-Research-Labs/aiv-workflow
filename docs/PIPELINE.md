@@ -128,9 +128,19 @@ Layer 2 (these skills) calls Layer 1 (the `aiv` CLI) for every substrate operati
 - `or-review` / `rigor-audit` align to the protocol's SVP phases (probe / trace / falsify) rather
   than inventing parallel ones.
 
-## Not yet built (the road to full automation)
+## The orchestration layer (built)
 
-1. **Convergence terminator (Stage 12)** as an objective rule, replacing the human's "converged" call.
-2. **Gate enforcement of the all-class mandate** inside aiv-protocol (guard flags + N/A short-circuit).
-3. **The orchestration layer** that drives stages 1->14 unattended: calls each skill, detects the
-   gate state, and advances or loops.
+This section originally listed three things "not yet built" on the road to full automation. All
+three now exist in [`orchestration/`](../orchestration/README.md) (`src/fix_pipeline.mjs`; operating
+manual in [`MAINTAINER_GUIDE.md`](MAINTAINER_GUIDE.md)):
+
+1. **Convergence terminator (Stage 12)** — now an objective rule: the back-half loop terminates when
+   the completion contract is verified, all evidence classes are present and non-vacuous, CI is
+   green, and the review verdict is PASS — stable for N rounds at the same head. Conflicting gates
+   two rounds running are an oscillation HALT, never a silent pass.
+2. **Gate enforcement of the all-class mandate** — enforced harness-side: the packet gates assert
+   every Class A-F section exists (honest N/A rationales allowed) before a stage may pass.
+   Enforcement inside aiv-protocol's own guard (guard flags + N/A short-circuit) remains open.
+3. **The orchestration layer** — `fix_pipeline.mjs` drives stages 1->14 unattended: each stage is a
+   fresh isolated subagent, every transition gates on a schema-valid machine block, and failures
+   HALT fail-closed. The two human touchpoints stand: H1 (the finding) in, H2 (judge + merge) out.

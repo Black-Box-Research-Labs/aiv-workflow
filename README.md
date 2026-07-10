@@ -53,6 +53,11 @@ oracle** the agent cannot author or weaken — and then runs the exact same pipe
 (`launch-brief` classifies it `feature-absent` natively). [`docs/DRAFTING-DRIVES.md`](docs/DRAFTING-DRIVES.md)
 is the runbook.
 
+Wondering what this produces in practice? [`docs/CASE-STUDY.md`](docs/CASE-STUDY.md) walks a real
+merged, free-model-driven PR end to end — the evidence, the costs (~$0-19/drive, ~13 min of human
+judgment per merge), the pre-flight checklist, and the recipe for independently re-verifying any
+finished drive.
+
 ## Install
 
 First install the **`aiv` CLI** (Layer 1). It is **not published to PyPI** — install it from source out

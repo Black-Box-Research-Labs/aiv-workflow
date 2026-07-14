@@ -1,0 +1,15 @@
+{
+  "id": "PR-GAMMA-33",
+  "repo": "ImmortalDemonGod/black-box",
+  "cwd": "/home/user/black-box",
+  "baseBranch": "origin/main",
+  "changeIdPrefix": "pr-gamma-33-tracker-prod",
+  "headBranch": "claude/pr-gamma-33-tracker-ui-f87229",
+  "planPath": ".aiv/plans/pr-gamma-33-tracker-prod-plan.md",
+  "intentSource": "audit/pr-gamma-33-finding.md",
+  "intentLine": 9,
+  "bugSite": "`src/lib/tracker/preflight.ts:138` (validateEnvVars — the dispatch-side env check to re-target) + `src/pages/api/tracker/preflight.ts:40` (fetchActiveVmCount — the false-green-on-absent-token)",
+  "findingFile": "/home/user/aiv-workflow/orchestration/specs/pr-gamma-33/finding_pr_gamma_33.md",
+  "goalCondition": "npx tsc --noEmit && npx vitest run src/lib/tracker/preflight.spec.ts tests/unit/components/RunFullAuditModal.spec.ts",
+  "title": "PR-γ.33 — Tracker UI prod-functional closure (§1.1 drive-side): re-target preflight to forensic-node capability (Path B) + fix false-green quota"
+}

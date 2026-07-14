@@ -2641,11 +2641,27 @@ async function symbolGuardLive(cwd, baseRef = "origin/main") {
 // dev dependency) don't false-block — but any NEW failure (current − baseline) does. Single-sourced:
 // no stage hand-authors a file list. (design-tests is exempt — its job is to ADD red.)
 const DEFAULT_TEST_CMD = ".venv/bin/python -m pytest -q --tb=no -rfE";
-function parsePytestFailures(out) {                 // node-ids on FAILED/ERROR summary lines (pure)
+// #node: Node/JS lane. The deterministic provisioning + regression gate grew up on Python (venv + pytest).
+// A package.json repo with NO Python markers (uv.lock / pyproject.toml / setup.*) is a Node project: provision
+// it with npm and test it with its own `npm test` script — the same "self-configure from the repo" principle as
+// the Makefile/uv.lock detection. Every Python repo stays on the venv path unchanged (the Node lane engages ONLY
+// when there is genuinely no Python build surface), so this is additive, not a behavior change for existing drives.
+const DEFAULT_NODE_TEST_CMD = "npm test";
+function isNodeRepo(cwd) {
+  return existsSync(join(cwd, "package.json"))
+    && !existsSync(join(cwd, "uv.lock"))
+    && !existsSync(join(cwd, "pyproject.toml"))
+    && !existsSync(join(cwd, "setup.py"))
+    && !existsSync(join(cwd, "setup.cfg"));
+}
+function parsePytestFailures(out) {                 // failing node-ids: pytest FAILED/ERROR lines + vitest FAIL files (pure)
   const set = new Set();
   for (const ln of String(out || "").split("\n")) {
     const m = ln.match(/^(?:FAILED|ERROR)\s+(\S+)/);
-    if (m) set.add(m[1]);
+    if (m) { set.add(m[1]); continue; }
+    // vitest/jest: " FAIL  path/to/x.spec.ts" or "× path/to/x.test.ts > case" — best-effort, additive (Node lane).
+    const vm = ln.match(/^\s*(?:FAIL|×)\s+(\S+\.(?:spec|test)\.[cm]?[jt]sx?)\b/);
+    if (vm) set.add(vm[1]);
   }
   return set;
 }
@@ -2707,6 +2723,10 @@ async function fullSuiteRegression(cwd, testCmd) {  // mirrors CI (lint + full s
 // the repo's full check set (flake8+black+mypy+pytest). Enumerating checks in the harness was the recurring
 // "gate != CI" bug; deriving from the repo fixes it at the source.
 function ciTestCmd(cwd) {
+  if (isNodeRepo(cwd)) {                              // #node: package.json repo → its own `npm test` (else bare vitest)
+    try { const pj = JSON.parse(readFileSync(join(cwd, "package.json"), "utf8")); if (pj && pj.scripts && pj.scripts.test) return DEFAULT_NODE_TEST_CMD; } catch {}
+    return "npx vitest run";
+  }
   try { const mk = readFileSync(join(cwd, "Makefile"), "utf8"); if (/^test:/m.test(mk)) return "make test"; } catch {}
   return DEFAULT_TEST_CMD;                            // fallback: bare pytest
 }
@@ -2743,7 +2763,29 @@ function repoFormatters(cwd) {
   if (!out.length) out.push({ tool: "isort", flags: "" }, { tool: "black", flags: "" });   // fallback: no fmt target
   return out;
 }
+// #node: the Node analogue of the black/isort fixup — run the repo's OWN pinned prettier + eslint --fix (via
+// `npx --no-install`, i.e. the versions CI checks against) on ONLY the change's own JS/TS/Astro files. Same
+// contract: deterministic, whitespace/lint-only, scope-disciplined, best-effort (never throws). Prevents the
+// #107 thrash (a weak model looping on a prettier/eslint --check it cannot hand-emulate) on a Node repo.
+async function autoFormatChangedNode(cwd, base) {
+  const lists = await Promise.all([
+    _exec("git", ["-C", cwd, "diff", "--name-only", `${base}..HEAD`]),
+    _exec("git", ["-C", cwd, "diff", "--name-only"]),
+    _exec("git", ["-C", cwd, "diff", "--name-only", "--cached"]),
+  ]);
+  const files = [...new Set(lists.flatMap((l) => (l.out || "").split("\n")).map((x) => x.trim())
+    .filter((f) => /\.(ts|tsx|js|jsx|mjs|cjs|astro|css|md|json)$/.test(f) && existsSync(join(cwd, f))))];
+  if (!files.length) return { changed: false, files: [] };
+  const before = ((await _exec("git", ["-C", cwd, "status", "--porcelain"])).out || "");
+  const q = files.map((f) => JSON.stringify(f)).join(" ");
+  await _exec("bash", ["-lc", `cd ${cwd} && npx --no-install prettier --write ${q} 2>&1 | tail -5`]);
+  const lintable = files.filter((f) => /\.(ts|tsx|js|jsx|mjs|cjs|astro)$/.test(f)).map((f) => JSON.stringify(f)).join(" ");
+  if (lintable) await _exec("bash", ["-lc", `cd ${cwd} && npx --no-install eslint --fix ${lintable} 2>&1 | tail -5`]);
+  const after = ((await _exec("git", ["-C", cwd, "status", "--porcelain"])).out || "");
+  return { changed: after !== before, files };
+}
 async function autoFormatChanged(cwd, base) {
+  if (isNodeRepo(cwd)) return autoFormatChangedNode(cwd, base);   // #node: prettier + eslint --fix lane
   const lists = await Promise.all([
     _exec("git", ["-C", cwd, "diff", "--name-only", `${base}..HEAD`]),
     _exec("git", ["-C", cwd, "diff", "--name-only"]),
@@ -2910,7 +2952,28 @@ function venvBuildCmd(hasUvLock, mk) {
   if (/^install:/m.test(mk)) return "python3 -m venv .venv && make install";
   return "python3 -m venv .venv && (.venv/bin/pip install -e '.[test]' || .venv/bin/pip install -e '.[dev]' || .venv/bin/pip install -e .)";
 }
+// #node: provision a Node project — `npm ci` (lockfile present) else `npm install`, with a usable node_modules +
+// a working `node` as the FUNCTIONAL-env check (mirrors the venv's `.venv/bin/python` success gate). `npm ci` is
+// strict (lockfile must match package.json); on a mismatch that yields no node_modules, fall back to `npm install`
+// so a stale lock doesn't HALT the drive at ground. Honest: SUCCESS is a usable node_modules, NOT the installer's
+// exit code (a peer-dep warning is noise, not a build break — the regression suite still gates correctness).
+async function provisionNodeEnv(cwd) {
+  const hasLock = existsSync(join(cwd, "package-lock.json")) || existsSync(join(cwd, "npm-shrinkwrap.json"));
+  const primary = hasLock ? "npm ci" : "npm install";
+  console.error(`[provision] ${primary} (package.json detected — Node lane)`);
+  let v = await _exec("bash", ["-lc", `cd ${cwd} && ${primary} 2>&1 | tail -40`]);
+  const hasModules = () => existsSync(join(cwd, "node_modules"));
+  if (!hasModules() && hasLock) {
+    console.error(`[provision] '${primary}' produced no node_modules — falling back to 'npm install'`);
+    v = await _exec("bash", ["-lc", `cd ${cwd} && npm install 2>&1 | tail -40`]);
+  }
+  const nodeOk = (await _exec("bash", ["-lc", `cd ${cwd} && node -e "process.exit(0)"`])).code === 0;
+  const ok = hasModules() && nodeOk;
+  console.error(`[provision] node_modules ${ok ? "FUNCTIONAL" : "NON-FUNCTIONAL"}${ok ? "" : "\n" + (v.out + v.err).slice(-600)}`);
+  return ok;
+}
 async function provisionEnv(cwd, spec) {
+  if (isNodeRepo(cwd)) return provisionNodeEnv(cwd);   // #node: a package.json repo (no Python markers) → npm lane
   let mk = ""; try { mk = readFileSync(join(cwd, "Makefile"), "utf8"); } catch {}
   // #43: build a REAL per-worktree `.venv`. The earlier #42 shared-venv SYMLINK was wrong — `python3 -m venv`
   // (and uv) refuse to build THROUGH a symlink ("Unable to create directory"), producing a NON-FUNCTIONAL .venv
@@ -5471,6 +5534,17 @@ async function selftest() {
   t("gateCI: empty/absent checks => NOT green (fail-closed, #45)", gateCI({ checks: [] }) === false && gateCI({}) === false);
   t("gateCI: a required success passes; a required failure fails", gateCI({ checks: [{ required: true, conclusion: "success" }] }) === true && gateCI({ checks: [{ required: true, conclusion: "failure" }] }) === false);
   t("recordStep writes a scrubbed jsonl line (secret dropped)", (() => { const o = process.env.FIX_TRAINDATA_DIR; const td = join(tmpdir(), `traintest_${process.pid}_${Date.now()}`); process.env.FIX_TRAINDATA_DIR = td; const r = recordStep({ changeIdPrefix: "t1", id: "F1", repo: "o/r" }, { kind: "step", input: { prompt: "leak ghp_" + "a".repeat(36) } }); const f = join(td, "drives", "t1", "steps.jsonl"); const ok = existsSync(f) && readFileSync(f, "utf8").includes("DROPPED") && r.secret === true; if (o) process.env.FIX_TRAINDATA_DIR = o; else delete process.env.FIX_TRAINDATA_DIR; return ok; })());
+  // #node: Node/JS lane — provisionEnv/ciTestCmd route a package.json repo to npm without disturbing the Python path.
+  t("#node isNodeRepo: true for package.json + no python markers", (() => { const d = join(tmpdir(), `nl_${process.pid}_${Date.now()}`); mkdirSync(d, { recursive: true }); writeFileSync(join(d, "package.json"), JSON.stringify({ name: "x", scripts: { test: "vitest run" } })); const r = isNodeRepo(d); rmSync(d, { recursive: true, force: true }); return r === true; })());
+  t("#node isNodeRepo: false when uv.lock present (Python repo keeps the venv lane)", (() => { const d = join(tmpdir(), `nl_${process.pid}_${Date.now()}_uv`); mkdirSync(d, { recursive: true }); writeFileSync(join(d, "package.json"), "{}"); writeFileSync(join(d, "uv.lock"), ""); const r = isNodeRepo(d); rmSync(d, { recursive: true, force: true }); return r === false; })());
+  t("#node isNodeRepo: false when pyproject.toml present", (() => { const d = join(tmpdir(), `nl_${process.pid}_${Date.now()}_py`); mkdirSync(d, { recursive: true }); writeFileSync(join(d, "package.json"), "{}"); writeFileSync(join(d, "pyproject.toml"), ""); const r = isNodeRepo(d); rmSync(d, { recursive: true, force: true }); return r === false; })());
+  t("#node isNodeRepo: false with no package.json", (() => { const d = join(tmpdir(), `nl_${process.pid}_${Date.now()}_none`); mkdirSync(d, { recursive: true }); const r = isNodeRepo(d); rmSync(d, { recursive: true, force: true }); return r === false; })());
+  t("#node ciTestCmd: npm test when package.json has a test script", (() => { const d = join(tmpdir(), `nl_${process.pid}_${Date.now()}_ct`); mkdirSync(d, { recursive: true }); writeFileSync(join(d, "package.json"), JSON.stringify({ scripts: { test: "vitest run" } })); const r = ciTestCmd(d); rmSync(d, { recursive: true, force: true }); return r === "npm test"; })());
+  t("#node ciTestCmd: npx vitest run when no test script", (() => { const d = join(tmpdir(), `nl_${process.pid}_${Date.now()}_nts`); mkdirSync(d, { recursive: true }); writeFileSync(join(d, "package.json"), JSON.stringify({ name: "y" })); const r = ciTestCmd(d); rmSync(d, { recursive: true, force: true }); return r === "npx vitest run"; })());
+  t("#node ciTestCmd: a Python repo (no package.json) still falls back to pytest DEFAULT_TEST_CMD", (() => { const d = join(tmpdir(), `nl_${process.pid}_${Date.now()}_pyt`); mkdirSync(d, { recursive: true }); const r = ciTestCmd(d); rmSync(d, { recursive: true, force: true }); return r === DEFAULT_TEST_CMD; })());
+  t("#node DEFAULT_NODE_TEST_CMD is an npm command", typeof DEFAULT_NODE_TEST_CMD === "string" && DEFAULT_NODE_TEST_CMD.includes("npm"));
+  t("#node provisionNodeEnv + autoFormatChangedNode are wired functions", typeof provisionNodeEnv === "function" && typeof autoFormatChangedNode === "function");
+  t("#node parsePytestFailures also catches a vitest FAIL line (additive; pytest unaffected)", parsePytestFailures("FAILED tests/x.py::test_a\n FAIL  src/lib/tracker/preflight.spec.ts > env").has("src/lib/tracker/preflight.spec.ts") && parsePytestFailures("FAILED tests/x.py::test_a").has("tests/x.py::test_a"));
   // #61: driveDirId — one finding -> one corpus dir regardless of upstream casing (fixes pytest-fixer-F15/f15 split)
   t("#61 driveDirId: lowercases the change-prefix", driveDirId({ changeIdPrefix: "pytest-fixer-F15" }) === "pytest-fixer-f15");
   t("#61 driveDirId: uppercase finding-id and lowercase prefix collapse to ONE dir", driveDirId({ changeIdPrefix: "pytest-fixer-F15" }) === driveDirId({ changeIdPrefix: "pytest-fixer-f15" }));

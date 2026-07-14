@@ -43,6 +43,16 @@ behavior absent + an external oracle as `goalCondition` + a stub at baseline as 
 `LIVE_STAGES` tasks carry no finding literals — everything is `{{SPEC}}`
 placeholders resolved by `applySpec`, so the spec is the only per-finding input.
 
+## Language support
+
+The deterministic layer (provisioning + the regression/baseline gate) self-configures from the repo. A
+Python repo (`uv.lock` / `pyproject.toml` / `setup.*` / a Makefile `test:`) is provisioned with a venv and
+tested with pytest — unchanged. A **Node/JS repo** (a `package.json` with no Python markers) takes the Node
+lane: `provisionEnv` runs `npm ci` (or `npm install`) with `node_modules` as the functional-env check,
+`ciTestCmd` runs the repo's own `npm test` (else `npx vitest run`), and the formatter fixup runs
+`prettier --write` + `eslint --fix` on the change's own files. The stage *prompts* still lean Python — a
+capable driver adapts from the finding's toolchain section; state the toolchain there for a weak driver.
+
 ## The two convergence loops
 
 - **Loop #1 (plan):** `planConverge` iterates plan ⟷ check-drift until the plan gate passes; a repeated

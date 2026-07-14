@@ -2811,7 +2811,31 @@ async function autoFormatChanged(cwd, base) {
 // the module nor the class exists), which design-tests' PACKET gate doesn't catch (it validates the packet, not
 // test runnability) and which then breaks write-code's WHOLE-suite collection. This gate runs `pytest
 // --collect-only` on the NEW test files and surfaces the import error so design-tests fixes it at the source.
+// #node: the Node/vitest analogue of collectCheck. Vitest imports+runs in one shot, so a clean import
+// (collects), non-emptiness (>=1 test), and RED-ness (fails against the current buggy code) are read off ONE
+// `vitest run` of the changed *.spec.ts / *.test.ts files. Same fail-closed contract as the pytest path.
+async function collectCheckNode(cwd, base) {
+  const newTests = (await _exec("git", ["-C", cwd, "diff", "--name-only", `${base}..HEAD`])).out.trim().split("\n")
+    .filter((f) => /\.(spec|test)\.[cm]?[jt]sx?$/.test(f) && !f.endsWith(".bug-catalog.md") && existsSync(join(cwd, f)));
+  if (!newTests.length) return { ok: false, reason: "no-new-tests", files: [],
+    errors: "No NEW/changed vitest spec (*.spec.ts / *.test.ts) was committed. The design-tests deliverable is a RED vitest test that pins the finding's defect — the bug-catalog alone is NOT sufficient. Add or extend a *.spec.ts that IMPORTS the real symbol from the finding's LOCATION file and asserts its CORRECT expected value, so it FAILS against the current (buggy) code. Do NOT put test code in the bug-catalog." };
+  const withSentinel = newTests.filter((f) => { try { return readFileSync(join(cwd, f), "utf8").includes(SCAFFOLD_SENTINEL); } catch { return false; } });
+  if (withSentinel.length) return { ok: false, reason: "unfilled-scaffold", files: newTests,
+    errors: `The scaffolded test ${withSentinel.join(", ")} still contains the harness sentinel — replace it with a REAL assertion that FAILS against the CURRENT (buggy) value.` };
+  const q = newTests.map((f) => JSON.stringify(f)).join(" ");
+  const r = await _exec("bash", ["-lc", `cd ${cwd} && timeout 300 npx vitest run ${q} 2>&1`]);
+  const out = r.out + r.err;
+  if (/Failed to load|Cannot find (module|package|name)|ERR_MODULE_NOT_FOUND|Transform failed|SyntaxError|does not provide an export|ReferenceError:/i.test(out))
+    return { ok: false, reason: "import-error", errors: out.slice(-1300), files: newTests };
+  if (/No test (files? )?found|No test suite found|no tests? to run/i.test(out))
+    return { ok: false, reason: "no-test-items", files: newTests,
+      errors: `The new test file(s) ${newTests.join(", ")} define NO runnable test — vitest found 0 tests. A design-tests deliverable must contain at least one it()/test() with a REAL assertion that FAILS against the current buggy value.` };
+  if (r.code === 0) return { ok: false, reason: "green-not-red", files: newTests,
+    errors: `The new test(s) ${newTests.join(", ")} PASS against the CURRENT (buggy, pre-fix) code — not a valid RED (prove-it's baseline seam would reject them and HALT). A RED test MUST FAIL now, while the bug is present: assert the SPECIFIC correct value/effect the buggy path fails to produce, and ensure the buggy code path is actually reached. vitest output (exit ${r.code}):\n${out.slice(-1200)}` };
+  return { ok: true, reason: "ok", errors: "", files: newTests };
+}
 async function collectCheck(cwd, base) {
+  if (isNodeRepo(cwd)) return collectCheckNode(cwd, base);   // #node: vitest lane
   const newTests = (await _exec("git", ["-C", cwd, "diff", "--name-only", `${base}..HEAD`])).out.trim().split("\n")
     .filter((f) => /(^|\/)tests?\/.*\.py$/.test(f) && !f.endsWith(".bug-catalog.md") && existsSync(join(cwd, f)));
   // #145 (vacuous-pass hole — observed live once #143 got a 1B model to write ONLY the bug-catalog, narrate the
@@ -2881,12 +2905,17 @@ function seamFindingPath(bugSite) {
 async function seamReExec(cwd, spec) {
   const base = baseRefOf(spec);
   try {
+    const node = isNodeRepo(cwd);   // #node: vitest lane for the SEAM (filter + runner + base-worktree deps)
     const changed = (await _exec("git", ["-C", cwd, "diff", "--name-only", `${base}..HEAD`])).out.trim().split("\n");
-    const newTests = changed.filter((f) => /(^|\/)tests?\/.*\.py$/.test(f) && !f.endsWith(".bug-catalog.md") && existsSync(join(cwd, f)));
+    const newTests = changed.filter((f) => (node ? /\.(spec|test)\.[cm]?[jt]sx?$/.test(f) : /(^|\/)tests?\/.*\.py$/.test(f)) && !f.endsWith(".bug-catalog.md") && existsSync(join(cwd, f)));
     if (!newTests.length) return { ok: false, why: "no NEW test file vs base — there is nothing to demonstrate the seam with" };
     const py = existsSync(join(cwd, ".venv", "bin", "python")) ? resolve(cwd, ".venv", "bin", "python") : "python3";
     const files = newTests.map((f) => JSON.stringify(f)).join(" ");
-    const runAt = async (dir) => { const r = await _exec("bash", ["-lc", `cd ${dir} && timeout 180 ${py} -m pytest -q -p no:cacheprovider ${files} 2>&1`]); return { code: r.code, out: (r.out + r.err).slice(-2500) }; };
+    const runAt = async (dir) => {
+      const cmd = node ? `cd ${dir} && timeout 300 npx vitest run ${files} 2>&1`
+                       : `cd ${dir} && timeout 180 ${py} -m pytest -q -p no:cacheprovider ${files} 2>&1`;
+      const r = await _exec("bash", ["-lc", cmd]); return { code: r.code, out: (r.out + r.err).slice(-2500) };
+    };
     let red = null, redMethod = "";
     // #192 (D-3): the RED baseline must demonstrate the FINDING's defect, not a MASKING error. Checking out the whole
     // base commit reintroduces unrelated absences (an import fix bundled in HEAD) that abort BEFORE the defect line —
@@ -2916,7 +2945,12 @@ async function seamReExec(cwd, spec) {
       if (add.code !== 0) return { ok: false, why: `baseline worktree add failed: ${(add.out + add.err).slice(-140)}` };
       const pip = existsSync(join(cwd, ".venv", "bin", "pip")) ? resolve(cwd, ".venv", "bin", "pip") : null;
       const installable = pip && ["setup.py", "pyproject.toml", "setup.cfg"].some((f) => existsSync(join(cwd, f)));
-      const repoint = async (dir) => { if (installable) await _exec("bash", ["-lc", `cd ${dir} && ${pip} install -e . --no-deps -q 2>&1`]); };
+      // #node: the throwaway base worktree has no node_modules; vitest needs it to resolve imports. Symlink cwd's
+      // node_modules (deps are identical base↔HEAD for this change) so the base run resolves without a full npm ci.
+      const repoint = async (dir) => {
+        if (node) { if (dir !== cwd && existsSync(join(cwd, "node_modules")) && !existsSync(join(dir, "node_modules"))) await _exec("bash", ["-lc", `ln -s ${JSON.stringify(join(cwd, "node_modules"))} ${JSON.stringify(join(dir, "node_modules"))} 2>/dev/null || true`]); return; }
+        if (installable) await _exec("bash", ["-lc", `cd ${dir} && ${pip} install -e . --no-deps -q 2>&1`]);
+      };
       try {
         for (const f of newTests) { mkdirSync(join(wt, dirname(f)), { recursive: true }); copyFileSync(join(cwd, f), join(wt, f)); }
         await repoint(wt);
@@ -2925,7 +2959,7 @@ async function seamReExec(cwd, spec) {
       } finally { await repoint(cwd); await _exec("git", ["-C", cwd, "worktree", "remove", "--force", wt]); }
     }
     const green = await runAt(cwd);                                                  // GREEN at HEAD (finding file restored)
-    const redKind = /error during collection|ImportError|ModuleNotFoundError|SyntaxError/i.test(red.out) ? "import-error (symbol absent at base?)" : "assertion failure";
+    const redKind = /error during collection|ImportError|ModuleNotFoundError|SyntaxError|Failed to load|Cannot find (module|name)|ERR_MODULE_NOT_FOUND|does not provide an export/i.test(red.out) ? "import-error (symbol absent at base?)" : "assertion failure";
     try {                                                                             // harness-produced evidence, next to the agent's
       const ev = join(cwd, ".github", "aiv-packets", "evidence", String(spec.changeIdPrefix || "change"));
       mkdirSync(ev, { recursive: true });
@@ -5544,6 +5578,16 @@ async function selftest() {
   t("#node ciTestCmd: a Python repo (no package.json) still falls back to pytest DEFAULT_TEST_CMD", (() => { const d = join(tmpdir(), `nl_${process.pid}_${Date.now()}_pyt`); mkdirSync(d, { recursive: true }); const r = ciTestCmd(d); rmSync(d, { recursive: true, force: true }); return r === DEFAULT_TEST_CMD; })());
   t("#node DEFAULT_NODE_TEST_CMD is an npm command", typeof DEFAULT_NODE_TEST_CMD === "string" && DEFAULT_NODE_TEST_CMD.includes("npm"));
   t("#node provisionNodeEnv + autoFormatChangedNode are wired functions", typeof provisionNodeEnv === "function" && typeof autoFormatChangedNode === "function");
+  t("#node collectCheckNode is wired (design-tests collect gate has a vitest lane)", typeof collectCheckNode === "function");
+  t("#node test-file filter: matches *.spec.ts / *.test.tsx, rejects .py/.ts/bug-catalog", (() => {
+    const re = /\.(spec|test)\.[cm]?[jt]sx?$/;
+    return re.test("src/lib/tracker/preflight.spec.ts") && re.test("tests/unit/components/RunFullAuditModal.spec.ts")
+      && re.test("a/b.test.tsx") && re.test("x.spec.mjs") && !re.test("tests/test_x.py") && !re.test("src/foo.ts") && !re.test("x.bug-catalog.md");
+  })());
+  t("#node collect/seam pytest filter unchanged for Python repos", (() => {
+    const re = /(^|\/)tests?\/.*\.py$/;
+    return re.test("tests/test_x.py") && re.test("a/test/y.py") && !re.test("src/lib/tracker/preflight.spec.ts");
+  })());
   t("#node parsePytestFailures also catches a vitest FAIL line (additive; pytest unaffected)", parsePytestFailures("FAILED tests/x.py::test_a\n FAIL  src/lib/tracker/preflight.spec.ts > env").has("src/lib/tracker/preflight.spec.ts") && parsePytestFailures("FAILED tests/x.py::test_a").has("tests/x.py::test_a"));
   // #61: driveDirId — one finding -> one corpus dir regardless of upstream casing (fixes pytest-fixer-F15/f15 split)
   t("#61 driveDirId: lowercases the change-prefix", driveDirId({ changeIdPrefix: "pytest-fixer-F15" }) === "pytest-fixer-f15");

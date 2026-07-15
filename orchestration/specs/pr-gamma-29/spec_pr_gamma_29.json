@@ -1,0 +1,15 @@
+{
+  "id": "PR-GAMMA-29",
+  "repo": "ImmortalDemonGod/black-box",
+  "cwd": "/home/user/black-box-pr-gamma-29",
+  "baseBranch": "origin/main",
+  "changeIdPrefix": "pr-gamma-29-writer-parity",
+  "headBranch": "claude/pr-gamma-29-writer-plumbing",
+  "planPath": ".aiv/plans/pr-gamma-29-writer-parity-plan.md",
+  "intentSource": "audit/pr-gamma-29-finding.md",
+  "intentLine": 9,
+  "bugSite": "`scripts/verify-quality-score-parity.sh` (ABSENT — the feature entry point the SEAM reverts) + `engine/commands/cycle-test-runs-writer.ts:106` (computeQualityScore — the TS formula the bash side cross-validates)",
+  "findingFile": "/home/user/aiv-workflow/orchestration/specs/pr-gamma-29/finding_pr_gamma_29.md",
+  "goalCondition": "bash scripts/verify-quality-score-parity.sh && npx tsc --noEmit && npx vitest run engine/commands/cycle-test-runs-writer.spec.ts",
+  "title": "PR-γ.29 — writer quality-score parity (D4): independent bash↔TS cross-validation + D1-D3 spec pin (D5 diagnostic + live-fire = H2)"
+}

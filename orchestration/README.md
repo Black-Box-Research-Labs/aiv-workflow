@@ -37,7 +37,11 @@ cursor, stopping only on a fail-closed HALT or SPINE COMPLETE.
 A drive is parameterized by a per-finding spec: `id`, `repo`, base branch, change prefix, the cited intent
 source, the bug site, and the **`goalCondition`** — the machine-checkable oracle that decides "fixed."
 `bake/specs/spec_f017_template.json` is a complete worked example; hand-author one, or generate specs from
-your own findings queue. For non-bug-fix work (a feature / consistency / refactor), draft the finding first —
+your own findings queue. `src/specgen_from_audit.mjs` is that generator for a **forensic-audit corpus**: it
+joins `02-findings.json` (Class-E intent + bug site) with `05-plan.json` (`verification_signal` →
+`goalCondition`) into ready-to-drive specs + a harness-native `queue.jsonl` + a topological `drive-order.json`
+that flags which findings have a machine oracle vs. need one sharpened (`--selftest` first; see its header).
+For non-bug-fix work (a feature / consistency / refactor), draft the finding first —
 [`../docs/DRAFTING-DRIVES.md`](../docs/DRAFTING-DRIVES.md) is the runbook (the `feature-absent` shape:
 behavior absent + an external oracle as `goalCondition` + a stub at baseline as the `bugSite`).
 `LIVE_STAGES` tasks carry no finding literals — everything is `{{SPEC}}`

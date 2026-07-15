@@ -1307,7 +1307,14 @@ function ciVerdict(checkRuns, baselineFailed = []) {                      // pur
   const baseSet = new Set(baselineFailed || []);
   const novelFailed = failed.filter((f) => !baseSet.has(f.name));
   const preexistingFailed = failed.filter((f) => baseSet.has(f.name));
-  return { total: runs.length, pending, failed, novelFailed, preexistingFailed, allGreen: runs.length > 0 && pending.length === 0 && novelFailed.length === 0 };
+  // #197: a still-PENDING check that is a TOLERATED baseline-red (red on base) will end red/cancelled whatever it
+  // does, so it must gate neither H2-readiness NOR the poll-wait — otherwise a slow pre-existing-red job (e.g. a
+  // 40-min playwright that was already red at base) burns the entire POLL_TIMEOUT and HALTs the drive before it
+  // can even evaluate the fast NOVEL check that actually matters. pendingNovel = pending checks NOT in the
+  // baseline-red set — the only ones worth waiting on. allGreen ("ready for H2") = no NOVEL pending AND no NOVEL
+  // failed (pre-existing reds, pending or done, are tolerated and surfaced, never block).
+  const pendingNovel = pending.filter((n) => !baseSet.has(n));
+  return { total: runs.length, pending, pendingNovel, failed, novelFailed, preexistingFailed, allGreen: runs.length > 0 && pendingNovel.length === 0 && novelFailed.length === 0 };
 }
 async function ciStatus(repo, sha, baselineFailed = []) {
   const r = await fetch(`https://api.github.com/repos/${repo}/commits/${sha}/check-runs?per_page=100`,
@@ -1387,18 +1394,24 @@ async function pollCiLoop(repo, head, cwd, finding, spec) {
   for (let round = 1; round <= CAP; round++) {
     await pushHead(cwd, `HEAD:${head}`);                                  // CI must run on the latest (owned branch)
     const sha = (await _exec("git", ["-C", cwd, "rev-parse", "HEAD"])).out.trim();
-    const start = Date.now(); let st;
+    const start = Date.now(); let st, prevTotal = -1;
     for (;;) {                                                          // wait for CI to finish (bounded)
       st = await ciStatus(repo, sha, ciBase);
       if (!st.ok) halt9(`cannot read CI: ${st.error}`);
-      if (st.total > 0 && !st.pending.length) break;
+      if (st.total > 0 && !st.pending.length) break;                   // everything terminal
+      // #197: do NOT burn POLL_TIMEOUT waiting on SLOW tolerated baseline-red checks. Once the check set has
+      // REGISTERED (total stable across two consecutive polls — closes the post-push registration race in which a
+      // not-yet-registered NOVEL check would look like "no novel pending") and no NOVEL check is still pending,
+      // evaluate NOW; the still-churning baseline reds are tolerated whatever they finish as.
+      if (st.total > 0 && st.total === prevTotal && !st.pendingNovel.length) break;
       if (st.total === 0 && !repoHasCiWorkflows(cwd)) {   // no CI configured at all — 0 checks is definitive, not "not yet"
         console.error(`[ci] NO CI configured on ${repo} (no .github/workflows/*.y{,a}ml) — CI gate N/A; proceeding on the local regression gate + prove-it. Caveat surfaced for H2 (§7).`);
         try { writeFileSync(join(WORK, "ci_absent.flag"), `${repo} has no CI workflows; CI gate N/A at ${sha}\n`); } catch {}
         return;
       }
-      console.error(`[ci] round ${round} ${sha.slice(0, 7)}: ${st.total ? st.pending.length + " pending (" + st.pending.slice(0, 4).join(", ") + ")" : "no checks yet"} — waiting`);
+      console.error(`[ci] round ${round} ${sha.slice(0, 7)}: ${st.total ? st.pending.length + " pending (" + st.pending.slice(0, 4).join(", ") + ")" + (st.pendingNovel.length ? " [" + st.pendingNovel.length + " novel]" : " [all tolerated-base]") : "no checks yet"} — waiting`);
       if (Date.now() - start > POLL_TIMEOUT) halt9(`CI poll timeout at ${sha.slice(0, 7)}`);
+      prevTotal = st.total;
       await sleep(POLL_MS);
     }
     if (st.allGreen) { console.error(`[ci] GREEN at ${sha.slice(0, 7)} (${st.total} checks; ${st.preexistingFailed.length} pre-existing red TOLERATED) — authoritative gate PASSED → ready for H2`); return; }
@@ -1427,19 +1440,24 @@ async function confirmCiSettled(repo, cwd) {
   const start = Date.now(), POLL_MS = 30_000, TIMEOUT = 1_800_000;
   const halt = (why) => { try { mkdirSync(WORK, { recursive: true }); writeFileSync(join(WORK, "HALT_ci-final.md"), `# HALT ci-final\n\n${why}\n\n_${ts()}_\n`); } catch {}; console.error(`[HALT ci-final] ${why}`); process.exit(3); };
   const ciBase = loadCiBaseline();   // #26: tolerate the same pre-existing red checks poll-ci tolerated
+  let prevTotal = -1;
   for (;;) {
     const st = await ciStatus(repo, sha, ciBase);
     if (!st.ok) halt(`cannot read CI at final head ${sha.slice(0, 7)}: ${st.error}`);
-    if (st.total > 0 && !st.pending.length) {
-      if (st.allGreen) { console.error(`[ci-final] CONFIRMED green at the final head ${sha.slice(0, 7)} (${st.total} checks; ${st.preexistingFailed.length} pre-existing red tolerated) — truly H2-ready`); return; }
+    // #197: terminal when everything is done OR (check set registered + stable across two polls) and only
+    // tolerated baseline reds remain pending — same anti-hang rule as the poll-ci loop.
+    const registered = st.total > 0 && st.total === prevTotal;
+    if (st.total > 0 && (!st.pending.length || (registered && !st.pendingNovel.length))) {
+      if (st.allGreen) { console.error(`[ci-final] CONFIRMED green at the final head ${sha.slice(0, 7)} (${st.total} checks; ${st.preexistingFailed.length} pre-existing red tolerated${st.pendingNovel.length === 0 && st.pending.length ? "; " + st.pending.length + " tolerated-base still churning — not gating" : ""}) — truly H2-ready`); return; }
       halt(`final head ${sha.slice(0, 7)} has NEW red after convergence: ${st.novelFailed.map((f) => f.name + "=" + f.conclusion).join(", ")}`);
     }
     if (st.total === 0 && !repoHasCiWorkflows(cwd)) {
       console.error(`[ci-final] NO CI configured on ${repo} — CI gate N/A; final head ${sha.slice(0, 7)} rests on the local regression gate + prove-it (caveat for H2).`);
       return;
     }
-    console.error(`[ci-final] ${sha.slice(0, 7)}: ${st.total ? st.pending.length + " pending (" + st.pending.slice(0, 4).join(", ") + ")" : "no checks yet"} — waiting`);
+    console.error(`[ci-final] ${sha.slice(0, 7)}: ${st.total ? st.pending.length + " pending (" + st.pending.slice(0, 4).join(", ") + ")" + (st.pendingNovel.length ? " [" + st.pendingNovel.length + " novel]" : " [all tolerated-base]") : "no checks yet"} — waiting`);
     if (Date.now() - start > TIMEOUT) halt(`CI poll timeout at final head ${sha.slice(0, 7)}`);
+    prevTotal = st.total;
     await sleep(POLL_MS);
   }
 }
@@ -5534,6 +5552,20 @@ async function selftest() {
   { const runs2 = [{ status: "completed", conclusion: "failure", name: "tests_linux", id: 1 }, { status: "completed", conclusion: "failure", name: "validate-packet", id: 2 }];
     const v = ciVerdict(runs2, ["tests_linux"]);   // tests_linux pre-existing, validate-packet is NEW (fix's fault)
     t("ciVerdict: NEW failure alongside a pre-existing one still blocks, names only the novel one", v.allGreen === false && v.novelFailed.length === 1 && v.novelFailed[0].name === "validate-packet"); }
+  // #197: a still-PENDING baseline-red check must NOT gate H2 nor the poll-wait; a pending NOVEL check still does
+  { const stillRunningBaseRed = [{ status: "in_progress", name: "playwright" }, { status: "completed", conclusion: "success", name: "vitest" }];
+    const v = ciVerdict(stillRunningBaseRed, ["playwright"]);   // playwright red at base, still churning on the PR
+    t("ciVerdict #197: a PENDING baseline-red does not block allGreen", v.allGreen === true && v.pendingNovel.length === 0 && v.pending[0] === "playwright"); }
+  { const pendingNovelCheck = [{ status: "in_progress", name: "validate-packet" }, { status: "completed", conclusion: "success", name: "vitest" }];
+    const v = ciVerdict(pendingNovelCheck, ["playwright"]);   // a NOVEL check is still pending → must keep waiting
+    t("ciVerdict #197: a PENDING novel check still blocks allGreen + is listed in pendingNovel", v.allGreen === false && v.pendingNovel.length === 1 && v.pendingNovel[0] === "validate-packet"); }
+  { // exact γ.33 shape: validate-packet terminal-FAILED (novel) while playwright (base-red) still churns
+    const g33 = [{ status: "completed", conclusion: "failure", name: "validate-packet", id: 7 }, { status: "in_progress", name: "playwright" }, { status: "completed", conclusion: "cancelled", name: "vitest" }];
+    const v = ciVerdict(g33, ["playwright", "vitest"]);
+    t("ciVerdict #197: γ.33 shape — novel red blocks, no novel pending (playwright/vitest tolerated)", v.allGreen === false && v.novelFailed.length === 1 && v.novelFailed[0].name === "validate-packet" && v.pendingNovel.length === 0);
+    // and once validate-packet goes green, still-pending playwright must NOT hold up H2-readiness
+    const g33fixed = [{ status: "completed", conclusion: "success", name: "validate-packet", id: 8 }, { status: "in_progress", name: "playwright" }, { status: "completed", conclusion: "cancelled", name: "vitest" }];
+    t("ciVerdict #197: γ.33 fixed — H2-ready while a tolerated-base playwright still runs", ciVerdict(g33fixed, ["playwright", "vitest"]).allGreen === true); }
 
   // PR-summary audit (Stage 12) — deterministic red flags on the body the human reads first
   t("prSummaryIssues: stale TODO flagged", prSummaryIssues("x TODO: y").some((i) => i.includes("TODO")));

@@ -1387,7 +1387,10 @@ function repoHasCiWorkflows(cwd) {
 }
 async function pollCiLoop(repo, head, cwd, finding, spec) {
   if (!process.env.GIT_TOKEN) { console.error("[poll-ci] no GIT_TOKEN"); process.exit(2); }
-  const CAP = 6, POLL_MS = 30_000, POLL_TIMEOUT = 2_400_000;
+  // #198: self-hosted runners back up under multi-PR load (many queued 40-min jobs starve the fast NOVEL check
+  // the fix actually needs). A merely-SLOW queue must not HALT a code-complete drive — the backlog self-clears
+  // when the long jobs hit their own job-timeout. Default 90 min (was 40), env-overridable for slower runners.
+  const CAP = 6, POLL_MS = 30_000, POLL_TIMEOUT = Number(process.env.FIX_CI_POLL_TIMEOUT_MS) || 5_400_000;
   const halt9 = (why) => { try { mkdirSync(WORK, { recursive: true }); writeFileSync(join(WORK, "HALT_poll-ci.md"), `# HALT poll-ci\n\n${why}\n\n_${ts()}_\n`); } catch {}; markHalted(spec, "poll-ci", why); console.error(`[HALT poll-ci] ${why}`); process.exit(3); };
   const ciBase = await captureCiBaseline(repo, cwd, (spec && spec.baseBranch) || "origin/main");   // #26: pre-existing red checks to tolerate
   let prevSig = null;
@@ -1437,7 +1440,7 @@ async function confirmCiSettled(repo, cwd) {
   if (!process.env.GIT_TOKEN) { console.error("[ci-final] no GIT_TOKEN"); process.exit(2); }
   await pushHead(cwd, `HEAD:${(await _exec("git", ["-C", cwd, "rev-parse", "--abbrev-ref", "HEAD"])).out.trim()}`).catch(() => {});
   const sha = (await _exec("git", ["-C", cwd, "rev-parse", "HEAD"])).out.trim();
-  const start = Date.now(), POLL_MS = 30_000, TIMEOUT = 1_800_000;
+  const start = Date.now(), POLL_MS = 30_000, TIMEOUT = Number(process.env.FIX_CI_POLL_TIMEOUT_MS) || 3_600_000;   // #198: env-overridable; 60-min default for the read-only final confirmation on a slow/backed-up runner
   const halt = (why) => { try { mkdirSync(WORK, { recursive: true }); writeFileSync(join(WORK, "HALT_ci-final.md"), `# HALT ci-final\n\n${why}\n\n_${ts()}_\n`); } catch {}; console.error(`[HALT ci-final] ${why}`); process.exit(3); };
   const ciBase = loadCiBaseline();   // #26: tolerate the same pre-existing red checks poll-ci tolerated
   let prevTotal = -1;

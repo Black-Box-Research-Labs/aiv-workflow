@@ -124,7 +124,7 @@ function selftest() {
 
 // ── build one drive unit (plan item -> {spec, meta, row}) ───────────────────────────────────────────
 function buildUnit(item, findingsById, opts) {
-  const { repo, base, tag, auditFile, auditMd } = opts;
+  const { repo, base, tag, auditFile, auditMd, oracles } = opts;
   const { goal, findings } = parseLinks(item.links_to);
   const covered = findings.map((fid) => findingsById[fid]).filter(Boolean);
   const primary = covered[0] || null;                       // Class-E anchor = the first linked finding
@@ -132,7 +132,11 @@ function buildUnit(item, findingsById, opts) {
   const changeIdPrefix = [tag, item.id.toLowerCase(), slug(item.title, 28)].filter(Boolean).join("-");
   const bugSite = firstSite(item.location) || (primary && firstSite(primary.location)) || null;
   const intentLine = primary ? intentLineOf(auditMd, primary.id) : null;
-  const goalQuality = classifyGoal(item.verification_signal);
+  // goalCondition source: a hand-authored oracle override (keyed by plan id) wins over the plan's prose
+  // verification_signal. Overrides let an operator sharpen prose into an approach-AGNOSTIC machine outcome.
+  const overridden = !!(oracles && oracles[item.id]);
+  const goalCond = (overridden ? oracles[item.id] : item.verification_signal) || null;
+  const goalQuality = classifyGoal(goalCond);
   // "drivable now" = a real machine/pytest oracle at a code site. A prose verification_signal is still
   // drivable (launch-brief must synthesize the machine check), but it needs sharpening first — do NOT
   // count it as ready, or the queue overstates readiness (the failure mode this whole system prevents).
@@ -149,24 +153,24 @@ function buildUnit(item, findingsById, opts) {
     intentSource: auditFile,                                // Class E = the AUDIT record (02 file), not the code site
     intentLine,
     bugSite,
-    goalCondition: item.verification_signal || null,        // the machine oracle, sourced from the 05-plan
+    goalCondition: goalCond,                                // machine oracle: override if given, else the plan's signal
     findingFile: null,                                      // harness intake writes finding_<id>.txt at drive time
     headBranch: `fix/${changeIdPrefix}`,
     title: `${item.id} (${specId}): ${item.title}`,
     _meta: {                                                // ignored by the harness; provenance + operator triage
       plan_id: item.id, covers: findings, severity, effort: item.effort || null,
       depends_on: item.depends_on || [], plan_order: item.order ?? null,
-      goal_quality: goalQuality, drivable_now: drivableNow, goal_item: goal,
+      goal_quality: goalQuality, drivable_now: drivableNow, goal_item: goal, oracle_overridden: overridden,
       change: item.change || null,
     },
   };
   // queue.jsonl row — the ratified-queue shape specFromRow() consumes (repo carried SHORT for reconcile match).
   const row = {
     finding_id: specId, repo: String(repo).split("/").pop(), location: bugSite,
-    goal_condition: item.verification_signal || null,
+    goal_condition: goalCond,
     intent_source: auditFile, intent_line: intentLine,
     plan_id: item.id, change_prefix: changeIdPrefix, covers: findings, depends_on: item.depends_on || [],
-    severity, effort: item.effort || null, drivable_now: drivableNow, goal_quality: goalQuality,
+    severity, effort: item.effort || null, drivable_now: drivableNow, goal_quality: goalQuality, oracle_overridden: overridden,
   };
   return { spec, row, meta: spec._meta };
 }
@@ -178,6 +182,12 @@ function main() {
   const repo = getArg("--repo"), base = getArg("--base", "origin/main");
   const outDir = getArg("--out", join(process.cwd(), "specs")), tag = getArg("--tag", "fix");
   const auditFile = getArg("--intent-source", "audit/02-static-audit.md");
+  const oraclesPath = getArg("--oracles");
+  let oracles = {};
+  if (oraclesPath) {
+    if (!existsSync(oraclesPath)) { console.error(`[specgen] --oracles file not found: ${oraclesPath}`); process.exit(2); }
+    oracles = tolerantJson(readFileSync(oraclesPath, "utf8")); // { "P02": "sharpened machine goalCondition", ... }
+  }
   const missing = [["--findings", findingsPath], ["--plan", planPath], ["--audit-md", auditMdPath], ["--repo", repo]].filter(([, v]) => !v).map(([k]) => k);
   if (missing.length) { console.error(`[specgen] missing required flags: ${missing.join(", ")}\n  see the header for usage, or run --selftest`); process.exit(2); }
   for (const [f, p] of [["--findings", findingsPath], ["--plan", planPath], ["--audit-md", auditMdPath]])
@@ -192,7 +202,10 @@ function main() {
   if (!findings.length || !items.length) { console.error(`[specgen] empty corpus: ${findings.length} findings, ${items.length} plan items`); process.exit(2); }
 
   const { ordered, cyclic } = topoSort(items);
-  const units = ordered.map((it) => buildUnit(it, findingsById, { repo, base, tag, auditFile, auditMd }));
+  const units = ordered.map((it) => buildUnit(it, findingsById, { repo, base, tag, auditFile, auditMd, oracles }));
+  const overriddenKeys = Object.keys(oracles).filter((k) => units.some((u) => u.spec._meta.plan_id === k));
+  const unknownOracles = Object.keys(oracles).filter((k) => !k.startsWith("_") && !units.some((u) => u.spec._meta.plan_id === k));
+  if (unknownOracles.length) console.error(`[specgen] WARNING: --oracles keys match no plan item: ${unknownOracles.join(", ")}`);
 
   mkdirSync(outDir, { recursive: true });
   for (const f of readdirSync(outDir)) if (/^spec_.*\.json$/.test(f)) try { unlinkSync(join(outDir, f)); } catch {} // idempotent regen
@@ -237,11 +250,17 @@ function main() {
     `node orchestration/src/fix_pipeline.mjs --drive --spec ${outDir}/spec_${units[0].spec._meta.plan_id}_${units[0].spec.id}.json --cwd <worktree>`,
     "```", ``,
     `Pre-flight first: \`fix_pipeline.mjs --selftest\` then \`--dry-run\`. For a batch, feed \`queue.jsonl\` to \`drive_supervisor.sh\` per row, honoring the depends_on order above.`, ``,
+    `## Regenerate this queue`, ``,
+    "```bash",
+    `node orchestration/src/specgen_from_audit.mjs \\`,
+    `  --findings ${findingsPath} --plan ${planPath} --audit-md ${auditMdPath} \\`,
+    `  ${oraclesPath ? `--oracles ${oraclesPath} ` : ""}--repo ${repo} --base ${base} --tag ${tag} --out ${outDir}`,
+    "```", ``,
   ].filter((l) => l !== null).join("\n");
   writeFileSync(join(outDir, "SPECGEN_REPORT.md"), report + "\n");
 
   console.error(`[specgen] wrote ${units.length} specs + queue.jsonl + drive-order.json + SPECGEN_REPORT.md -> ${outDir}`);
-  console.error(`[specgen] ${drivable.length} drivable now · ${needOracle.length} need oracle · ${goalItems.length} goal-items · ${uncovered.length}/${findings.length} findings uncovered`);
+  console.error(`[specgen] ${drivable.length} drivable now · ${needOracle.length} need oracle · ${goalItems.length} goal-items · ${uncovered.length}/${findings.length} findings uncovered · ${overriddenKeys.length} oracle-overrides applied`);
 }
 
 main();

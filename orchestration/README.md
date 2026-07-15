@@ -32,6 +32,12 @@ node src/fix_pipeline.mjs --drive --spec <spec.json>   # THE SPINE: auto-chain H
 `src/drive_supervisor.sh <spec.json> <log>` — it self-detaches and auto-resumes on the atomic `state.json`
 cursor, stopping only on a fail-closed HALT or SPINE COMPLETE.
 
+To drive a WHOLE queue (a `drive-order.json` from `specgen_from_audit.mjs`), `src/drive_all.mjs` walks it in
+`depends_on` order, driving each ready spec through `--drive` and skipping goal/non-ready items and anything
+blocked by a dependency that did not COMPLETE (a HALT/REFUTE stops that lineage, never force-passes). It is
+resumable (`fleet-state.json`) and has a zero-spawn `--dry-run`/`--selftest`:
+`node src/drive_all.mjs --order <drive-order.json> --specs <dir> --cwd <worktree>`.
+
 ## The spec
 
 A drive is parameterized by a per-finding spec: `id`, `repo`, base branch, change prefix, the cited intent

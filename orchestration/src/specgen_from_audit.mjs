@@ -28,7 +28,7 @@
  * No dependencies. Pure helpers are unit-tested by --selftest, mirroring fix_pipeline.mjs discipline.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, unlinkSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 const argv = process.argv.slice(2);
 const getArg = (n, d) => { const i = argv.indexOf(n); return i >= 0 ? (argv[i + 1] ?? true) : d; };
@@ -124,7 +124,7 @@ function selftest() {
 
 // ── build one drive unit (plan item -> {spec, meta, row}) ───────────────────────────────────────────
 function buildUnit(item, findingsById, opts) {
-  const { repo, base, tag, auditFile, auditMd, oracles } = opts;
+  const { repo, base, tag, auditFile, auditMd, oracles, sha } = opts;
   const { goal, findings } = parseLinks(item.links_to);
   const covered = findings.map((fid) => findingsById[fid]).filter(Boolean);
   const primary = covered[0] || null;                       // Class-E anchor = the first linked finding
@@ -172,7 +172,25 @@ function buildUnit(item, findingsById, opts) {
     plan_id: item.id, change_prefix: changeIdPrefix, covers: findings, depends_on: item.depends_on || [],
     severity, effort: item.effort || null, drivable_now: drivableNow, goal_quality: goalQuality, oracle_overridden: overridden,
   };
-  return { spec, row, meta: spec._meta };
+  // The finding text the drive reads (H1). It MUST carry a `===== CANONICAL INTENT (Class E) =====` section
+  // with a SHA-pinned URL — aiv commit -i needs it, and without it aiv close fails E001 (Missing Class E),
+  // which stalls design-tests. This mirrors fix_pipeline.mjs's own intake materialization (its --finding-id
+  // path builds this; a bare --drive --spec without findingFile does NOT, so the generator supplies it here).
+  const intentUrl = `https://github.com/${repo}/blob/${sha || String(base).replace(/^origin\//, "")}/${auditFile}#L${intentLine ?? ""}`;
+  const findingText = [
+    `===== FINDING ${specId} (${severity}) — ${repo} =====`, ``,
+    `LOCATION: ${bugSite || (primary && primary.location) || "?"}`,
+    `CATEGORY: ${(primary && primary.class) || (goal ? "goal" : "?")}`,
+    `GOAL (verification — when is it fixed?): ${goalCond || "(derive from the description below)"}`, ``,
+    `DESCRIPTION (from ${auditFile} L${intentLine ?? "?"}):`,
+    (primary && primary.evidence) || item.change || "(see the plan change)",
+    covered.length > 1 ? `\n(This plan item covers findings: ${findings.join(", ")}.)` : "", ``,
+    `===== CANONICAL INTENT (Class E) =====`,
+    `The ORIGINAL in-repo audit record that produced this finding. Every AIV packet's Class E (Intent`,
+    `Alignment) MUST point to THIS SHA-pinned URL — never a taskmaster task or the pipeline's launch-brief:`,
+    intentUrl,
+  ].join("\n");
+  return { spec, row, findingText, meta: spec._meta };
 }
 
 // ── main ────────────────────────────────────────────────────────────────────────────────────────
@@ -182,6 +200,7 @@ function main() {
   const repo = getArg("--repo"), base = getArg("--base", "origin/main");
   const outDir = getArg("--out", join(process.cwd(), "specs")), tag = getArg("--tag", "fix");
   const auditFile = getArg("--intent-source", "audit/02-static-audit.md");
+  const sha = getArg("--sha", null);   // base commit SHA for the SHA-pinned Class-E intent URL (else branch-pinned)
   const oraclesPath = getArg("--oracles");
   let oracles = {};
   if (oraclesPath) {
@@ -202,14 +221,20 @@ function main() {
   if (!findings.length || !items.length) { console.error(`[specgen] empty corpus: ${findings.length} findings, ${items.length} plan items`); process.exit(2); }
 
   const { ordered, cyclic } = topoSort(items);
-  const units = ordered.map((it) => buildUnit(it, findingsById, { repo, base, tag, auditFile, auditMd, oracles }));
+  const units = ordered.map((it) => buildUnit(it, findingsById, { repo, base, tag, auditFile, auditMd, oracles, sha }));
   const overriddenKeys = Object.keys(oracles).filter((k) => units.some((u) => u.spec._meta.plan_id === k));
   const unknownOracles = Object.keys(oracles).filter((k) => !k.startsWith("_") && !units.some((u) => u.spec._meta.plan_id === k));
   if (unknownOracles.length) console.error(`[specgen] WARNING: --oracles keys match no plan item: ${unknownOracles.join(", ")}`);
 
   mkdirSync(outDir, { recursive: true });
-  for (const f of readdirSync(outDir)) if (/^spec_.*\.json$/.test(f)) try { unlinkSync(join(outDir, f)); } catch {} // idempotent regen
-  for (const u of units) writeFileSync(join(outDir, `spec_${u.spec._meta.plan_id}_${u.spec.id}.json`), JSON.stringify(u.spec, null, 2) + "\n");
+  for (const f of readdirSync(outDir)) if (/^(spec_.*\.json|finding_.*\.txt)$/.test(f)) try { unlinkSync(join(outDir, f)); } catch {} // idempotent regen
+  for (const u of units) {
+    const base = `${u.spec._meta.plan_id}_${u.spec.id}`;
+    const findingPath = resolve(outDir, `finding_${base}.txt`);   // absolute: the harness reads spec.findingFile via existsSync
+    writeFileSync(findingPath, u.findingText + "\n");
+    u.spec.findingFile = findingPath;                             // point the spec at its finding (carries the CANONICAL INTENT)
+    writeFileSync(join(outDir, `spec_${base}.json`), JSON.stringify(u.spec, null, 2) + "\n");
+  }
   writeFileSync(join(outDir, "queue.jsonl"), units.map((u) => JSON.stringify(u.row)).join("\n") + "\n");
 
   // coverage: every finding must be either covered by a plan item, or explicitly listed as uncovered (no silent drop).

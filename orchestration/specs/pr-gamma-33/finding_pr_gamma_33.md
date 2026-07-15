@@ -21,6 +21,12 @@ generic stage prompts — they do not apply here. Use the Node toolchain:
 - **Spec locations (contract [9] / [[feedback-astro-routing-collision]]):** put NEW specs under
   `src/lib/tracker/preflight.spec.ts` (exists — extend it) and `tests/unit/components/RunFullAuditModal.spec.ts`
   (new). **Zero** `*.spec.ts` under `src/pages/` (Astro routing collision) beyond what already exists there.
+- **DB live-fire IS runnable here (Docker is up).** The watcher-nodes DAL integration test
+  (`tests/db/watcher-nodes-dal.integration.spec.ts`) is gated `describe.skipIf(BB_SKIP_DB_PROVIDER)` and skips
+  by default. A Docker daemon IS available in this environment, so at **prove-it** run the composed-path
+  live-fire FOR REAL and record it as a real **Class A PASS** — do NOT WARN/skip it:
+  `BB_SKIP_DB_PROVIDER=0 npx vitest run tests/db/watcher-nodes-dal.integration.spec.ts` (testcontainers pulls
+  `postgres:15-alpine`, which is already cached). Only fall back to WARN if Docker is genuinely unreachable.
 
 ## Required behavior that is ABSENT
 

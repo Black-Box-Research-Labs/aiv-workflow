@@ -15,7 +15,7 @@
 // Config (env or flags): --repo <owner/name> --repo-path <clone> --audit-file <path> --base <ref> --queue <file>.
 // Defaults target the aiv-protocol 2026-06-18 forensic corpus.
 
-import { readFileSync, writeFileSync, existsSync, statSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, statSync, mkdirSync } from "node:fs";
 import { execFileSync, spawn } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -35,6 +35,14 @@ const LOG_DIR    = arg("--log-dir", join(HERE, "..", "src", "fix", ".work", "log
 const TD         = process.env.FIX_TRAINDATA_DIR || "";
 const DONE = new Set(["fixed", "done", "refuted"]);                  // statuses that satisfy a dependency
 
+// Ephemeral in-flight state (which finding is driving + its absolute log/spec paths) lives in a gitignored
+// sidecar under .work/, NOT the tracked queue — so a live drive never churns machine-specific paths or a
+// transient "driving" status into orchestration/src/queue.jsonl. The queue carries only DURABLE dispositions.
+const RUNTIME = join(SRC, "fix", ".work", "drive-runtime.json");
+const loadRt = () => { try { return existsSync(RUNTIME) ? JSON.parse(readFileSync(RUNTIME, "utf8")) : {}; } catch { return {}; } };
+const saveRt = (rt) => { try { mkdirSync(dirname(RUNTIME), { recursive: true }); writeFileSync(RUNTIME, JSON.stringify(rt, null, 2)); } catch {} };
+const nowIso = () => new Date().toISOString().replace(/\.\d+Z$/, "Z");
+
 if (!existsSync(QUEUE)) { console.error(`[drive-next] no queue at ${QUEUE} — run gen_queue.mjs first.`); process.exit(2); }
 const rows = readFileSync(QUEUE, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l));
 const saveQueue = () => writeFileSync(QUEUE, rows.map((r) => JSON.stringify(r)).join("\n") + "\n");
@@ -43,7 +51,12 @@ const planStatus = () => Object.fromEntries(rows.map((r) => [r.plan_id, r.status
 // ── reconcile: resolve a "driving" row from its supervisor log (primary) + traindata manifest (corroboration).
 function terminalFromLog(logPath) {
   if (!logPath || !existsSync(logPath)) return null;
-  const t = readFileSync(logPath, "utf8");
+  let t = readFileSync(logPath, "utf8");
+  // The supervisor APPENDS across attempts/resumes, so a prior attempt's HALT text lingers. Scope detection to
+  // the LATEST supervisor run only (after its "START detached pid=" banner) — else a resumed drive that is still
+  // running reads as halted off a stale marker.
+  const i = t.lastIndexOf("START detached pid=");
+  if (i >= 0) t = t.slice(i);
   if (/finding REFUTED \(exit 5\)/.test(t)) return "refuted";          // successful terminal — defect not present
   if (/DONE — H2 resolved|SPINE COMPLETE/.test(t)) return "done";      // PR parked at H2 (awaiting human merge)
   if (/fail-closed HALT \(exit 3\)|STOP — FATAL|deterministic gate\/artifact FAIL|exhausted \d+ attempts/.test(t)) return "halted";
@@ -56,19 +69,23 @@ function terminalFromManifest(changePrefix) {
   try { const m = JSON.parse(readFileSync(mf, "utf8")); return m.terminal || null; } catch { return null; }
 }
 function reconcile() {
-  let changed = false;
-  for (const r of rows) {
-    if (r.status !== "driving") continue;
-    const term = terminalFromLog(r.drive_log) || (terminalFromManifest(r.change_prefix) ? "done" : null);
-    if (!term) continue;
-    r.status = term === "done" ? "done" : term === "refuted" ? "refuted" : "halted";
-    r.terminal = terminalFromManifest(r.change_prefix) || term;
-    r.reconciled_at = new Date().toISOString().replace(/\.\d+Z$/, "Z");
-    changed = true;
-    console.error(`[drive-next] reconciled ${r.plan_id}/${r.finding_id}: ${r.status}` +
-      (r.status === "halted" ? " (needs attention — see log)" : ""));
+  const rt = loadRt(); let rtChanged = false, qChanged = false;
+  for (const [fid, info] of Object.entries(rt)) {
+    const term = terminalFromLog(info.log) || (terminalFromManifest(info.change_prefix) ? "done" : null);
+    if (!term) continue;                                     // still running — leave the in-flight marker
+    const r = rows.find((x) => x.finding_id === fid);
+    if (r && (r.status === "pending" || r.status === "driving")) {
+      r.status = term === "done" ? "done" : term === "refuted" ? "refuted" : "halted";
+      r.terminal = terminalFromManifest(info.change_prefix) || term;
+      for (const k of ["drive_log", "spec_file", "drive_started", "reconciled_at"]) delete r[k];   // scrub legacy transient fields
+      qChanged = true;
+      console.error(`[drive-next] reconciled ${r.plan_id}/${fid}: ${r.status}` +
+        (r.status === "halted" ? " (needs attention — see log)" : ""));
+    }
+    delete rt[fid]; rtChanged = true;                        // drive reached terminal → drop the in-flight marker
   }
-  if (changed) saveQueue();
+  if (rtChanged) saveRt(rt);
+  if (qChanged) saveQueue();
 }
 
 // ── PR reconciliation: GitHub is the source of truth for what's already been driven. Each tick, match every
@@ -105,7 +122,12 @@ async function reconcilePrs() {
   if (changed) saveQueue();
 }
 
-function inFlight() { return rows.find((r) => r.status === "driving"); }
+function inFlight() {                                        // a drive whose sidecar marker hasn't been cleared
+  const rt = loadRt(); const fid = Object.keys(rt)[0];
+  if (!fid) return null;
+  const r = rows.find((x) => x.finding_id === fid) || {};
+  return { finding_id: fid, plan_id: r.plan_id || "?", log: rt[fid].log, started: rt[fid].started };
+}
 function isBlocked(r) {
   const ps = planStatus();
   return String(r.depends_on || "").split(",").map((s) => s.trim()).filter(Boolean)
@@ -128,7 +150,8 @@ function pickNext() {
 function rollup() {
   const by = {};
   for (const r of rows) by[r.status] = (by[r.status] || 0) + 1;
-  const order = ["driving", "pending", "done", "refuted", "fixed", "halted", "needs-human"];
+  const nf = Object.keys(loadRt()).length; if (nf) by.driving = nf;   // "driving" is sidecar-only, never a queue status
+  const order = ["driving", "pending", "inflight", "done", "refuted", "fixed", "halted", "needs-human"];
   return order.filter((k) => by[k]).map((k) => `${k}=${by[k]}`).join("  ");
 }
 
@@ -173,9 +196,9 @@ function launch(r) {
   const sup = spawn("bash", [join(SRC, "drive_supervisor.sh"), specFile, logFile],
     { cwd: SRC, env: process.env, stdio: "ignore", detached: true });
   sup.unref();
-  r.status = "driving"; r.drive_log = logFile; r.spec_file = specFile;
-  r.drive_started = new Date().toISOString().replace(/\.\d+Z$/, "Z");
-  saveQueue();
+  const rt = loadRt();                                       // record in-flight ONLY in the gitignored sidecar
+  rt[r.finding_id] = { plan_id: r.plan_id, change_prefix: prefix, log: logFile, spec: specFile, started: nowIso() };
+  saveRt(rt);                                                // queue row stays 'pending' until reconcile records a durable terminal
   console.error(`[drive-next] LAUNCHED ${r.plan_id}/${r.finding_id} → supervisor detached; log: ${logFile}`);
   return { launched: true, logFile };
 }
@@ -187,7 +210,7 @@ console.error(`[drive-next] queue: ${rollup()}`);
 
 const flying = inFlight();
 if (flying) {
-  console.error(`[drive-next] IN FLIGHT: ${flying.plan_id}/${flying.finding_id} (since ${flying.drive_started || "?"}) — log: ${flying.drive_log}`);
+  console.error(`[drive-next] IN FLIGHT: ${flying.plan_id}/${flying.finding_id} (since ${flying.started || "?"}) — log: ${flying.log}`);
   console.error(`[drive-next] one drive at a time; nothing to start. (Tail the log to watch it.)`);
   process.exit(0);
 }

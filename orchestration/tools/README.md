@@ -62,6 +62,7 @@ the next tick advances. Stop the loop when `drive_next` reports **`queue drained
 | `FIX_TRAINDATA_DIR` = a **writable git clone** | trajectory capture is fail-closed — no sink, no drive (exit 3) |
 | `claude` on `PATH` | the per-stage subagent driver |
 | `GIT_TOKEN` | freshness gate + PR reconcile + opening the PR (stage 8) |
+| **`aiv` on `PATH`** (`pip install -e <target-repo>`) | the harness's mechanical `aiv commit` in `design-tests` calls **bare `aiv`** — a venv-only `.venv/bin/aiv` is NOT enough; without a global `aiv` the drive HALTs fail-closed at `design-tests` (`exit 127`) |
 
 `drive_next --go` checks these and **refuses to launch** (rather than HALT mid-drive) if any is missing.
 
@@ -95,13 +96,16 @@ Nothing already handled gets re-driven, at four layers (defence in depth):
 | `plan_id`, `rank`, `depends_on` | `drive_next` (ordering + gating) | plan item id, security-first rank, `P##` deps |
 | `status`, `triage`, `pr` | `drive_next` (state machine) | `pending`/`fixed`/`inflight`/`driving`/`done`/`refuted`/`halted`/`needs-human` |
 
-**Statuses:** `pending` → `driving` → (`done` = PR@H2 / `refuted` = defect absent / `halted` = needs
-attention). `fixed` = merged already. `inflight` = open PR already. `needs-human` = plan item didn't
-converge (P77, P79) — a human decision, never auto-driven.
+**Statuses:** `pending` → (`done` = PR@H2 / `refuted` = defect absent / `halted` = needs attention).
+`fixed` = merged already. `inflight` = open PR already. `needs-human` = plan item didn't converge (P77,
+P79) — a human decision, never auto-driven. The transient **`driving`** state and its absolute log/spec
+paths are **not** written to the tracked queue — they live in a gitignored sidecar
+(`src/fix/.work/drive-runtime.json`), so a live drive never churns machine-specific paths into git.
 
 ## 5. Current snapshot (regenerate to refresh)
 
 `aiv-protocol` 2026-06-18 forensic corpus — **79 plan items**: **3 fixed** (P3/F96·C2, P16/F43·C1,
-P17/F113·H12), **1 inflight** (P4/F14·H1 traversal → PR #27), **2 needs-human** (P77, P79), **73 pending**.
-First pending by rank: **P1/F23** (tier-map unification). Cleaner single-surface first drives if you'd
-rather not start with the P1 refactor: **P5/F15** (SSRF) or **P4** once its PR merges.
+P17/F113·H12), **2 inflight** (P4/F14·H1 traversal → PR #27; **P5/F15·H2 SSRF → PR #28**, the first
+harness-driven drive), **2 needs-human** (P77, P79), **72 pending**. First pending by rank: **P1/F23**
+(tier-map unification). P5/F15 was the proof drive — it reproduced the SSRF, added a scheme+IP allowlist in
+`_is_url_allowed`, proved RED→GREEN, and opened PR #28 with the full trajectory captured to the training repo.

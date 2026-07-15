@@ -452,7 +452,16 @@ const claimVerdict = (c) => c && (c.verdict || c.result || c.status || c.outcome
 // rejected, and >=1 PASS is required so an agent cannot N/A its way past the behavioral gate.
 const claimResolved = (c) => {
   const v = claimVerdict(c);
-  return v === "PASS" || ((v === "N/A" || v === "NA") && typeof (c && c.rationale) === "string" && c.rationale.trim().length > 0);
+  // #warn: a WARN or N/A is RESOLVED iff it carries an EXPLANATION (rationale|reason) — same fail-closed spirit
+  // as the N/A fix. An ATTEMPTED-but-environment-blocked infra live-fire (e.g. testcontainers needs a Docker
+  // daemon a headless sandbox lacks) is honestly WARN, not N/A (it IS applicable, just unrunnable HERE); it is
+  // non-load-bearing when the goal_condition claims are all PASS + unverified_count===0 double-guards, and the
+  // adversarial or-review re-checks every claim downstream — so a rationalized WARN must not HALT the SEAM.
+  // Still fail-closed: a BARE WARN (no explanation) is rejected, UNVERIFIED/FAIL still block, and >=1 PASS is
+  // still required (the gateProveIt caller) so an agent cannot WARN/N/A its way past the behavioral gate.
+  const why = c && (c.rationale || c.reason);
+  const explained = typeof why === "string" && why.trim().length > 0;
+  return v === "PASS" || ((v === "N/A" || v === "NA" || v === "WARN") && explained);
 };
 const gateProveIt = (m) => m.unverified_count === 0 && m.claims.length > 0
   && m.claims.some((c) => claimVerdict(c) === "PASS") && m.claims.every(claimResolved);
@@ -5372,6 +5381,10 @@ async function selftest() {
   t("prove-it accepts a rationalized N/A claim alongside PASS (feature-drive Class-E live-fire N/A)", gateProveIt({ unverified_count: 0, claims: [{ verdict: "PASS" }, { verdict: "N/A", rationale: "pure-logic change, no infra boundary" }] }));
   t("prove-it BLOCKS a vacuous N/A with no rationale (fill-the-box anti-pattern)", !gateProveIt({ unverified_count: 0, claims: [{ verdict: "PASS" }, { verdict: "N/A" }] }));
   t("prove-it BLOCKS an all-N/A manifest with zero PASS (cannot N/A past the behavioral gate)", !gateProveIt({ unverified_count: 0, claims: [{ verdict: "N/A", rationale: "x" }, { verdict: "N/A", rationale: "y" }] }));
+  t("#warn: prove-it accepts a rationalized WARN alongside PASS (attempted-but-env-blocked infra live-fire)", gateProveIt({ unverified_count: 0, claims: [{ verdict: "PASS" }, { verdict: "WARN", reason: "testcontainers needs a Docker daemon this sandbox lacks; goal_condition claims all PASS; prod live-fire is H2" }] }));
+  t("#warn: prove-it accepts a WARN carrying `rationale` (synonym of reason)", gateProveIt({ unverified_count: 0, claims: [{ verdict: "PASS" }, { verdict: "WARN", rationale: "env-blocked" }] }));
+  t("#warn: prove-it BLOCKS a BARE WARN with no explanation (cannot WARN a real concern past the gate)", !gateProveIt({ unverified_count: 0, claims: [{ verdict: "PASS" }, { verdict: "WARN" }] }));
+  t("#warn: prove-it BLOCKS an all-WARN manifest with zero PASS", !gateProveIt({ unverified_count: 0, claims: [{ verdict: "WARN", reason: "x" }, { verdict: "WARN", reason: "y" }] }));
   t("CI gate blocks a required failure", !gateCI({ checks: [{ required: true, conclusion: "failure" }] }));
 
   // INHERITED robustness — validator (enum value), coercion, tolerant parse, extraction

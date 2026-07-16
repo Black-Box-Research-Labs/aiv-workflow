@@ -3,6 +3,7 @@
   "repo": "ImmortalDemonGod/black-box",
   "cwd": "/home/user/black-box-pr-gamma-29",
   "baseBranch": "origin/main",
+  "packetHeaderVersion": "v2.1",
   "changeIdPrefix": "pr-gamma-29-writer-parity",
   "headBranch": "claude/pr-gamma-29-writer-plumbing",
   "planPath": ".aiv/plans/pr-gamma-29-writer-parity-plan.md",

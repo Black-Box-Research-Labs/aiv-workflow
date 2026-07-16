@@ -42,7 +42,14 @@ const REQUIRED_CLASSES = ["A", "B", "C", "D", "E", "F"];
 // pre-stage HEAD and gate-select the first passer (EXP-2b: best-of-N lifted gpt-oss 60%->100%; the lever the
 // coder NEEDS now that laguna/qwen are daily-rate-limited and the cascade falls to gpt-oss — OBS-B). Fail-closed.
 const RESAMPLE_N = parseInt(process.env.FIX_RESAMPLE_N || "3", 10);
-let WORK = process.env.FIX_WORK || join(import.meta.dirname, "fix", ".work");  // anchored to the script dir, not cwd
+// #200: FIX_WORK may be passed RELATIVE (the babysit tick exports FIX_WORK=src/fix/.work-g29). The harness
+// (cwd=orchestration) and a spawned stage agent (cwd=the target WORKTREE) then resolve the SAME relative WORK
+// to DIFFERENT absolute dirs — so an agent told to Write its verdict/body to join(WORK,...) writes INTO THE
+// WORKTREE while the harness reads the empty orchestration-side copy → "aiv-audit verdict invalid" / "no body"
+// HALT even though the agent emitted correctly (and the stray files risk leaking into the PR). Resolve to an
+// ABSOLUTE path ONCE, here, so every join(WORK,...) handed to a worktree-cwd agent is cwd-independent. The
+// default is already absolute (script-anchored); a live drive is always launched from the orchestration dir.
+let WORK = process.env.FIX_WORK ? resolve(process.env.FIX_WORK) : join(import.meta.dirname, "fix", ".work");
 // TEST MODES MUST NOT touch production state: --selftest/--dry-run write state.json + HALT_*.md, which would
 // CLOBBER a live drive's resume cursor (running selftest before a commit silently reset the F82 cursor to
 // 'fresh' every time). isolateWork() redirects WORK to a throwaway temp dir for those modes.
@@ -5593,6 +5600,10 @@ async function selftest() {
   t("#199 prSummaryIssues: headerVersion v2.1 FLAGS a v2.2 body (stale-base target rejects v2.2)", prSummaryIssues("# AIV Verification Packet (v2.2)\n## Claim(s)\n## Evidence\n### Class A (Execution Evidence)\n### Class B (Referential Evidence)\n### Class E (Intent Alignment)\n## Verification Methodology\n## Summary", { headerVersion: "v2.1" }).some((i) => i.includes("AIV Verification Packet (v2.1)")));
   t("#199 prSummaryIssues: headerVersion v2.1 ACCEPTS a v2.1 body", prSummaryIssues("# AIV Verification Packet (v2.1)\n## Claim(s)\n## Evidence\n### Class A (Execution Evidence)\n### Class B (Referential Evidence)\n### Class E (Intent Alignment)\n## Verification Methodology\n## Summary", { headerVersion: "v2.1" }).every((i) => !i.includes("AIV Verification Packet")));
   t("#199 prSummaryIssues: DEFAULT (no headerVersion) still ACCEPTS a v2.2 body (newer-base target e.g. γ.33 unaffected — no churn)", prSummaryIssues("# AIV Verification Packet (v2.2)\n## Claim(s)\n## Evidence\n### Class A (Execution Evidence)\n### Class B (Referential Evidence)\n### Class E (Intent Alignment)\n## Verification Methodology\n## Summary").every((i) => !i.includes("AIV Verification Packet")));
+  // #200: a RELATIVE FIX_WORK must resolve to an ABSOLUTE path so a worktree-cwd stage agent and the
+  // orchestration-cwd harness write/read the SAME join(WORK,...) file (else the agent's verdict/body lands in
+  // the worktree and the harness reads an empty copy → false "verdict invalid"/"no body" HALT).
+  t("#200 relative FIX_WORK resolves to an absolute, cwd-independent WORK path", (() => { const r = resolve("src/fix/.work-g29"); return r.startsWith("/") && r.endsWith("/src/fix/.work-g29"); })());
   // #36: durable provenance anchor (tag) — derivation + the body declaration the back-half loop enforces
   t("provenanceTag derives aiv/<changeIdPrefix>", provenanceTag({ changeIdPrefix: "c2-f169" }) === "aiv/c2-f169" && provenanceTag({ changeIdPrefix: "rna-s2c3l0-020" }) === "aiv/rna-s2c3l0-020");
   t("prSummaryIssues: missing #36 provenance anchor flagged", prSummaryIssues("a packet with no anchor", { provenanceTag: "aiv/c2-f169" }).some((i) => i.includes("provenance anchor")));
